@@ -1328,7 +1328,7 @@ void CMenu::Tabs()
 				"Sets name to invisible character."
 			))
 			{
-				g_Engine.PlayerInfo_SetValueForKey("name", "kurva kokot");
+				g_Engine.PlayerInfo_SetValueForKey("name", ""); // try converting hex to str cause it will not compile
 			}
 			line_y += 40;
 
