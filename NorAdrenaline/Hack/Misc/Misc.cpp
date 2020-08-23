@@ -496,6 +496,8 @@ void change_name(char *str)
 
 void CMisc::Spam()
 {
+	Timer t{};
+
 	if (cvar.spam)
 	{
 		int delay = cvar.spam_timer;
@@ -537,11 +539,8 @@ void CMisc::Spam()
 				char cmdstr[256];
 				sprintf(cmdstr, s.c_str());
 
-				std::async(std::launch::async, [&cmdstr, &delay]() {
-					Timer t{};
-					if (t.test_and_set(delay))
-						g_Engine.pfnClientCmd(cmdstr);
-					});
+				if (t.test_and_set(delay))
+					g_Engine.pfnClientCmd(cmdstr);
 			}
 		}
 	}
@@ -593,9 +592,8 @@ void CMisc::NameStealer()
 void CMisc::CrashServer()
 {
 	char cmdstr[256];
-	char name[MAX_PLAYER_NAME_LENGTH];
 
-	std::string s1 = "name \"d #Spec_Help_Text #Spec_Duck\"";
-	strcpy_s(cmdstr, s1.c_str());
+	strcpy_s(cmdstr, "name \"d #Spec_Help_Text #Spec_Duck\"");
+
 	g_Engine.pfnClientCmd(cmdstr);
 }

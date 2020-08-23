@@ -232,17 +232,11 @@ void CCvars::Init()
 	air_duck = false;
 	jump_bug = false;
 	fps_boost = false;
-	StrafeDir = false;
-	movement_all = false;
 
-	///
-	teleport_z = false;
-	teleport_spectator = false;
-	teleport_v2 = false;
-	lagexploit = false;
+	adjust_speed = false;
+	adjust_speed = 0;
 	fakelatency = false;
-	fakeping_amount = 1;
-	///
+	fakelatency_amount = 0;
 
 	spam = false;
 	spam_timer = 0;
@@ -532,13 +526,15 @@ void CFunctions::SaveCvars()
 
 	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "bunnyhop", dtoa(s, cvar.bunnyhop));
 	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "auto strafe", dtoa(s, cvar.autostrafe));
-	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "strafe dir", dtoa(s, cvar.StrafeDir));
 	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "ground strafe bunnyhop", dtoa(s, cvar.gstrafe_bhop));
 	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "bhop noslowdown", dtoa(s, cvar.bhop_nsd));
 	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "ground strafe standup", dtoa(s, cvar.gstrafe_standup));;
 	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "jump bug", dtoa(s, cvar.jump_bug));
 	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "knifebot", dtoa(s, cvar.knifebot));
 	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "name_stealer", dtoa(s, cvar.name_stealer));
+
+	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "fake_latency_amount", dtoa(s, cvar.fakelatency_amount));
+	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "adjust_speed_amount", dtoa(s, cvar.adjust_speed_amount));
 
 	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "legit_teammates", dtoa(s, cvar.legit_teammates));
 	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "block_attack_after_kill", dtoa(s, cvar.block_attack_after_kill));
@@ -795,7 +791,8 @@ void CFunctions::LoadCvars()
 	cvar.bhop_nsd = atoi(g_Utils.cIniRead(g_pGlobals.IniPath, Section, "bhop_nsd", "0"));
 	cvar.gstrafe_bhop = atoi(g_Utils.cIniRead(g_pGlobals.IniPath, Section, "gstrafe_bhop", "0"));
 	cvar.gstrafe_standup = atoi(g_Utils.cIniRead(g_pGlobals.IniPath, Section, "gstrafe_standup", "0"));
-	cvar.StrafeDir = atoi(g_Utils.cIniRead(g_pGlobals.IniPath, Section, "strafe_dir", "0"));
+	cvar.fakelatency_amount = atof(g_Utils.cIniRead(g_pGlobals.IniPath, Section, "fake_latency_amount", "0"));
+	cvar.adjust_speed_amount = atof(g_Utils.cIniRead(g_pGlobals.IniPath, Section, "adjust_speed_amount", "0"));
 
 	cvar.TTT = atoi(g_Utils.cIniRead(g_pGlobals.IniPath, Section, "TTT", "0"));
 	cvar.status = atoi(g_Utils.cIniRead(g_pGlobals.IniPath, Section, "Aimbot configuration", "0"));

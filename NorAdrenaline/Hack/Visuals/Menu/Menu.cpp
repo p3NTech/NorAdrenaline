@@ -53,14 +53,17 @@ void CPlayer::Add_Player(int idx)
 	distance	= g_Player[idx].bAlive ? g_Player[idx].flDist : 0;
 	weapon		= g_PlayerExtraInfoList[idx].szWeaponName;
 
-	if (g_Player[idx].iTeam == CT)
-		team = "CT";
-	else if (g_Player[idx].iTeam == TERRORIST)
-		team = "T";
-	else if (g_Player[idx].iTeam == SPECTATOR)
-		team = "SPECTATOR";
-	else if (g_Player[idx].iTeam == UNASSIGNED)
-		team = "UNASSIGNED";
+	switch (g_Player[idx].iTeam)
+	{
+	case CT:
+		team = "CT"; break;
+	case TERRORIST:
+		team = "T"; break;
+	case SPECTATOR:
+		team = "SPECTATOR"; break;
+	case UNASSIGNED:
+		team = "UNASSIGNED"; break;
+	}
 }
 
 void CPlayer::Reset_player()
@@ -84,33 +87,20 @@ void CMenu::Init()
 	if (bInitialised)
 		return;
 
-	if (!player_avatar.index) player_avatar.index = g_pISurface->CreateNewTextureID(true);
-
-	if (!background.index) background.index = g_pISurface->CreateNewTextureID(true);
-
-	if (!icon_headshot.index) icon_headshot.index = g_pISurface->CreateNewTextureID(true);
-
-	if (!icon_aimbot.index) icon_aimbot.index = g_pISurface->CreateNewTextureID(true);
-
-	if (!icon_systems.index) icon_systems.index = g_pISurface->CreateNewTextureID(true);
-
-	if (!icon_options.index) icon_options.index = g_pISurface->CreateNewTextureID(true);
-
-	if (!icon_visuals.index) icon_visuals.index = g_pISurface->CreateNewTextureID(true);
-
-	if (!icon_members.index) icon_members.index = g_pISurface->CreateNewTextureID(true);
-
-	if (!icon_headshot_not_selected.index) icon_headshot_not_selected.index = g_pISurface->CreateNewTextureID(true);
-
-	if (!icon_aimbot_not_selected.index) icon_aimbot_not_selected.index = g_pISurface->CreateNewTextureID(true);
-
-	if (!icon_systems_not_selected.index) icon_systems_not_selected.index = g_pISurface->CreateNewTextureID(true);
-
-	if (!icon_options_not_selected.index) icon_options_not_selected.index = g_pISurface->CreateNewTextureID(true);
-
-	if (!icon_visuals_not_selected.index) icon_visuals_not_selected.index = g_pISurface->CreateNewTextureID(true);
-
-	if (!icon_members_not_selected.index) icon_members_not_selected.index = g_pISurface->CreateNewTextureID(true);
+	if (!player_avatar.index) player_avatar.index								= g_pISurface->CreateNewTextureID(true);
+	if (!background.index) background.index										= g_pISurface->CreateNewTextureID(true);
+	if (!icon_headshot.index) icon_headshot.index								= g_pISurface->CreateNewTextureID(true);
+	if (!icon_aimbot.index) icon_aimbot.index									= g_pISurface->CreateNewTextureID(true);
+	if (!icon_systems.index) icon_systems.index									= g_pISurface->CreateNewTextureID(true);
+	if (!icon_options.index) icon_options.index									= g_pISurface->CreateNewTextureID(true);
+	if (!icon_visuals.index) icon_visuals.index									= g_pISurface->CreateNewTextureID(true);
+	if (!icon_members.index) icon_members.index									= g_pISurface->CreateNewTextureID(true);
+	if (!icon_headshot_not_selected.index) icon_headshot_not_selected.index		= g_pISurface->CreateNewTextureID(true);
+	if (!icon_aimbot_not_selected.index) icon_aimbot_not_selected.index			= g_pISurface->CreateNewTextureID(true);
+	if (!icon_systems_not_selected.index) icon_systems_not_selected.index		= g_pISurface->CreateNewTextureID(true);
+	if (!icon_options_not_selected.index) icon_options_not_selected.index		= g_pISurface->CreateNewTextureID(true);
+	if (!icon_visuals_not_selected.index) icon_visuals_not_selected.index		= g_pISurface->CreateNewTextureID(true);
+	if (!icon_members_not_selected.index) icon_members_not_selected.index		= g_pISurface->CreateNewTextureID(true);
 
 	if (background.index &&
 		icon_headshot.index && icon_aimbot.index && icon_systems.index && icon_options.index && icon_visuals.index && icon_members.index &&
@@ -158,11 +148,12 @@ void CMenu::Init()
 		dwPaletteBlockedTime = 0;
 		dwListBlockedTime = 0;
 
-		//default menu position
-		MenuX = g_Screen.iWidth / 2;
-		MenuY = g_Screen.iHeight / 2;
-		plistX = g_Screen.iWidth / 2;
-		plistY = g_Screen.iHeight / 2;
+
+		// default menu position
+		MenuX	= 100;
+		MenuY	= 200;
+		plistX	= 100 + 650;
+		plistY	= 200;
 
 		iCurrentTab = 5; // default tab
 	}
@@ -1280,82 +1271,46 @@ void CMenu::Tabs()
 			if (cvar.TTT)
 				cvar.aim_teammates = cvar.esp_teammates = true;
 
-			Slider(x + box_indent_x, y + line_y, 0, 10000, cvar.name_stealer, "Name stealer", true, " ms");
-			line_y += 20;
-
-			if (DrawButton(x + box_indent_x, y + line_y, "Gamesites unban function",
-				"Randomization of setinfo variables that are gamesites server's using to identify banned players."
-			))
-			{
-				static int _ak, version, len;
-				static char* str;
-				char cmdstr[256];
-
-				srand(time(NULL));
-
-				len = rand() % 6 + 2;
-				_ak = rand() % 999 + 100;
-				version = rand() % 99999 + 10000;
-
-				str = func.gen_random(len);
-
-				std::string ch = std::to_string(func.hash_str(str));
-
-				std::string s1 = "setinfo clientHash " + ch + "; ";
-				std::string s2 = "setinfo _ak " + std::to_string(_ak) + "; ";
-				std::string s3 = "setinfo version " + std::to_string(version) + "; ";
-				std::string s123 = s1 + s2 + s3;
-
-				strcat_s(cmdstr, s123.c_str());
-
-				if (g_Local.status.connected)
-					g_Engine.pfnClientCmd("disconnect");
-
-				g_Engine.pfnClientCmd(cmdstr);
-
-				if (cvar.debug)
-				{
-					g_Engine.Con_Printf("================================\n");
-					g_Engine.Con_Printf("new clientHash %s\n", (PCHAR)ch.c_str());
-					g_Engine.Con_Printf("new _ak %s\n", (PCHAR)std::to_string(_ak).c_str());
-					g_Engine.Con_Printf("new version %s\n", (PCHAR)std::to_string(version).c_str());
-					g_Engine.Con_Printf("================================\n");
-				}
-			}
-			line_y += 22;
-
-			if (DrawButton(x + box_indent_x, y + line_y, "Invisible name",
-				"Sets name to invisible character."
-			))
-			{
-				g_Engine.PlayerInfo_SetValueForKey("name", "kurva kokot");
-			}
-			line_y += 40;
-
 			static int iSteamID;
 			InputField(x + box_indent_x, y + line_y, "SteamID", 31, iSteamID, []() { g_SteamID.Apply(iSteamID); });
 			line_y += 40;
-
-			std::string backup_name;
+			
+			static std::string backup_name;
 			static std::string nick;
+			static std::string new_name;
 
 			if (backup_name.empty() && nick.empty() && (backup_name == g_Engine.pfnGetCvarString("name")))
 				backup_name = g_Engine.pfnGetCvarString("name");
 
 			if (nick.empty() && !backup_name.empty() && (backup_name != g_Engine.pfnGetCvarString("name")))
 			{
-				g_Engine.PlayerInfo_SetValueForKey("name", backup_name.c_str());
+				new_name = backup_name;
 				backup_name.clear();
 			}
 
-			InputField(x + box_indent_x, y + line_y, "Name", 32, nick, []() { g_Engine.PlayerInfo_SetValueForKey("name", nick.c_str()); });
+			InputField(x + box_indent_x, y + line_y, "Name", 32, new_name, []() { if (!new_name.empty()) { g_Engine.PlayerInfo_SetValueForKey("name", new_name.c_str()); } });
 			line_y += 40;
 
 			Checkbox(x + box_indent_x, y + line_y, cvar.spam, "Chat spam");
 			line_y += 30;
 
-			Slider(x + box_indent_x, y + line_y, 0, 10000, cvar.spam_timer, "Spam timer", true, " ms");
-			line_y += 20;
+			Slider(x + box_indent_x, y + line_y, 0, 5000, cvar.spam_timer, "Spam timer", true, " ms");
+			line_y += 35;
+
+			Slider(x + box_indent_x, y + line_y, 0, 10000, cvar.name_stealer, "Name stealer", true, " ms");
+			line_y += 35;
+
+			Slider(x + box_indent_x, y + line_y, 0, 6000, cvar.adjust_speed_amount, "Adjust speed amount", true);
+			line_y += 35;
+
+			Checkbox(x + box_indent_x, y + line_y, cvar.fakelatency, " Fake latency");
+			line_y += 30;
+
+			Slider(x + box_indent_x, y + line_y, 0, 1000, cvar.fakelatency_amount, "Fake latency amount", true);
+			line_y += 35;
+
+			Slider(x + box_indent_x, y + line_y, 0, 1, cvar.esp_sound_minimum_volume, "Minimum volume sound");
+			line_y += 35;
 		}
 
 		{//BOX2
@@ -1369,7 +1324,7 @@ void CMenu::Tabs()
 			{
 				func.LoadCvars();
 			}
-			line_y += 22;
+			line_y += 25;
 
 			if (DrawButton(x + box_indent_x, y + line_y, "Save",
 				"Save current configuration."
@@ -1377,7 +1332,7 @@ void CMenu::Tabs()
 			{
 				func.SaveCvars();
 			}
-			line_y += 24;
+			line_y += 25;
 
 			if (cvar.rainbow == false)
 			{
@@ -1457,13 +1412,7 @@ void CMenu::Tabs()
 			line_y += 14;
 
 			Checkbox(x + box_indent_x, y + line_y, cvar.esp_fake, "Bypass esp blockers");
-			line_y += 30;
-
-			Slider(x + box_indent_x, y + line_y, 0, 1, cvar.esp_sound_minimum_volume, "Minimum volume sound");
-			line_y += 30;
-
-			Slider(x + box_indent_x, y + line_y, 0, 6000, cvar.fakeping_amount, "Adjust speed");
-			line_y += 20;
+			line_y += 14;
 
 			Checkbox(x + box_indent_x, y + line_y, cvar.spread_overlay_old, "Spread overlay old");
 			line_y += 18;
@@ -1474,14 +1423,14 @@ void CMenu::Tabs()
 			{
 				g_Misc.CrashServer();
 			}
-			line_y += 22;
+			line_y += 25;
 
 			if (DrawButton(x + box_indent_x, y + line_y, "Patch interp cvars", format("Patch interpolation cvars.\n %20s\n%20s", "-cl_updaterate", "-ex_interp").c_str()
 			))
 			{
 				g_Offsets.PatchInterpolation();
 			}
-			line_y += 22;
+			line_y += 25;
 
 			if (DrawButton(x + box_indent_x, y + line_y, "Disable lag compensation (server)",
 				"Force cl_lc to 0."
@@ -1489,7 +1438,47 @@ void CMenu::Tabs()
 			{
 				g_Engine.PlayerInfo_SetValueForKey("cl_lc", "0");
 			}
-			line_y += 22;
+			line_y += 25;
+
+			if (DrawButton(x + box_indent_x, y + line_y, "Randomize clientHash",
+				"Randomize (clientHash) setinfo variable that are some server's using to identify banned players."
+			))
+			{
+				static int _ak, version, len;
+				static char* str;
+				char cmdstr[256];
+
+				srand(time(NULL));
+
+				len = rand() % 6 + 2;
+				_ak = rand() % 999 + 100;
+				version = rand() % 99999 + 10000;
+
+				str = func.gen_random(len);
+
+				std::string ch = std::to_string(func.hash_str(str));
+
+				std::string s1 = format("setinfo clientHash %s", ch.c_str());
+
+				strcat_s(cmdstr, s1.c_str());
+
+				if (g_Local.status.connected)
+					g_Engine.pfnClientCmd("disconnect");
+
+				g_Engine.pfnClientCmd(cmdstr);
+
+				if (cvar.debug)
+					g_Engine.Con_Printf("new clientHash %s\n", (PCHAR)ch.c_str());
+			}
+			line_y += 25;
+
+			if (DrawButton(x + box_indent_x, y + line_y, "Invisible name",
+				"Sets name to invisible character."
+			))
+			{
+				g_Engine.PlayerInfo_SetValueForKey("name", "ᅠ");
+			}
+			line_y += 25;
 		}
 	}
 	else if (iCurrentTab == 6)
@@ -1652,9 +1641,6 @@ void CMenu::InputField(int x, int y, char* text, int maxLen, int& out, std::func
 
 	int iVal = std::atoi(value.c_str());
 
-	//static bool update		= false;
-	//static int attempts		= 0;
-
 	if (inParams && !callback && (keys[VK_RETURN] == true))
 	{
 		callback = true;
@@ -1667,25 +1653,6 @@ void CMenu::InputField(int x, int y, char* text, int maxLen, int& out, std::func
 
 	if (out != iVal)
 		out = iVal;
-
-	/*
-	if (out != iVal)
-		if (inputfield.test_and_set(500))
-			attempts++;
-
-	if (attempts == 3)
-	{
-		attempts = 0;
-		update = true;
-	}
-		
-	if (update)
-	{
-		update = false;
-		out = iVal;
-		Callback();
-	}
-	*/
 
 	if (!value.empty())
 		g_Drawing.DrawString(MENU, x + w / 2, y + (h / 2), 220, 220, 220, 255, FONT_CENTER, value.c_str());
@@ -1784,29 +1751,6 @@ void CMenu::InputField(int x, int y, char* text, int maxStrLen, std::string& out
 	if (out != sVal)
 		out = sVal;
 
-	/*
-	static bool update = false;
-	static int attempts = 0;
-
-	if (out != sVal)
-		if (inputfield.test_and_set(500))
-			attempts++;
-
-	if (attempts == 3)
-	{
-		attempts = 0;
-		update = true;
-	}
-
-	if (update)
-	{
-		update = false;
-		out = sVal;
-		Callback();
-	}
-	*/
-
-	// draw value
 	if (!value.empty())
 		g_Drawing.DrawString(MENU, x + w / 2, y + (h / 2), 220, 220, 220, 255, FONT_CENTER, value.c_str());
 	else
@@ -1956,6 +1900,7 @@ void CMenu::Palette(int x, int y, float &r, float &g, float &b)
 	unsigned int h = 8;
 
 	static DWORD dwTemporaryBlockTimer = 0;
+
 	//Close others and open this
 	if (GetTickCount64() - dwListBlockedTime > 200 && GetTickCount64() - dwPaletteBlockedTime > 200 && !bCursorInList && keys[VK_LBUTTON] && !IsDragging && CursorX >= x && CursorX <= x + w && CursorY >= y && CursorY <= y + h)
 	{

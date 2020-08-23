@@ -31,12 +31,11 @@ public:
 	void bhop_nsd(struct usercmd_s *cmd);
 	void gs_standup(struct usercmd_s *cmd);
 	void Fastrun(struct usercmd_s *cmd);
-	void RandomizeSteamID();
-	void unbanSteamID();
+	void RandomizeSteamIDMask();
 
-	void cem_TransmitBits();
+	void AdjustSpeed();
 	void JumpBug(float frametime, struct usercmd_s *cmd);
-	void air_duck(struct usercmd_s *cmd);
+	void AirDuck(struct usercmd_s *cmd);
 	void WalkTo(const Vector &vector, struct usercmd_s *cmd);
 	void MoveTo(const Vector &vector, CBaseLocal *ent, struct usercmd_s *cmd);
 private:

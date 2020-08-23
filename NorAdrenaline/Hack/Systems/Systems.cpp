@@ -653,7 +653,7 @@ void CSystems::JumpBug(float frametime, struct usercmd_s *cmd)
 	}
 }
 
-void CSystems::air_duck(struct usercmd_s *cmd)
+void CSystems::AirDuck(struct usercmd_s *cmd)
 {
 	if (g_Local.flHeight <= 20 && cvar.air_duck)
 	{
@@ -742,27 +742,6 @@ bool CSystems::Clamp(double _in, double low, double high)
 	}
 	return _in;
 }
-
-/*
-void CSystems::strafe_circle(struct usercmd_s *cmd)
-{
-	if (!cvar.cstrafe_temp) return;
-
-	static float CurYaw = 0.0f;
-	cmd->forwardmove = 1000.0f;
-	cmd->sidemove = 0.0f;
-	float Vel2D = pmove->velocity.Length2D();
-	if (Vel2D >= 50)
-	{
-		float TurnRate = this->Clamp((Vel2D / 100.f), 0.75f, 10.25f);
-		CurYaw += TurnRate;
-		if (CurYaw >= 180.f)
-			CurYaw = -180.f;
-
-		cmd->viewangles.y = CurYaw;
-	}
-}
-*/
 
 void CSystems::circle_strafe(float* circle_yaw, struct usercmd_s *cmd)
 {
@@ -873,7 +852,7 @@ bool CSystems::get_closest_plane(Vector* plane, int &ticks)
 
 	return false;
 }
-#define TIME_TO_TICKS(dt) ((int)(0.5f + (float)(dt) / pmove->frametime))
+
 bool CSystems::will_hit_wall(float finish_time, float turn_angle, Vector &plane)
 {
 	auto local = g_Local;
@@ -1213,10 +1192,10 @@ int CSystems::DetectStrafeDir(struct usercmd_s *cmd) {
 	}
 }
 
-void CSystems::RandomizeSteamID() {
-	DWORD dwMask = 0x5A448; // steamclient.dll+5A448
-	DWORD dwSteamID = 0x5AC4C; // steamclient.dll+5AC4C
-	DWORD dwFlag = 0x5B4D4; // steamclient.dll+5B4D
+void CSystems::RandomizeSteamIDMask() {
+	DWORD dwMask		= 0x5A448; // steamclient.dll+5A448
+	DWORD dwSteamID		= 0x5AC4C; // steamclient.dll+5AC4C
+	DWORD dwFlag		= 0x5B4D4; // steamclient.dll+5B4D
 	DWORD dwBase = reinterpret_cast<DWORD>(GetModuleHandle("steamclient.dll"));
 	char szMask[14];
 
@@ -1235,27 +1214,12 @@ void CSystems::RandomizeSteamID() {
 
 	g_pConsole->Printf("Randomized. New mask: %s", szMask);
 }
-void CSystems::unbanSteamID()
+
+void CSystems::AdjustSpeed()
 {
-	srand(GetTickCount());
-
-	DWORD NoSteamId = (DWORD)GetModuleHandle("steamclient.dll") + 0x5AC4C;
-	NoSteamId += 4; *(DWORD*)NoSteamId = 0x6F676C61;
-
-	DWORD UnLock = (DWORD)GetModuleHandle("steamclient.dll") + 0x5B4D4;
-	*(DWORD*)UnLock = 0;
-
-	DWORD SteamId = (DWORD)GetModuleHandle("steamclient.dll") + 0x5AC4C;
-	*(DWORD*)SteamId = rand() % 99999999;
-
-	g_pConsole->Printf("[NA] Validate as random Steam Enabled.");
-}
-
-void CSystems::cem_TransmitBits()
-{
-	if (cvar.lagexploit)
+	if (cvar.adjust_speed)
 	{
-		int val = cvar.fakeping_amount;
+		int val = cvar.adjust_speed_amount;
 		int in = val * 10;
 
 		func.AdjustSpeed(in);

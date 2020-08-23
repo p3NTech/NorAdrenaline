@@ -404,7 +404,7 @@ void CVisuals::Crosshair()
 	}
 }
 
-void CVisuals::PredictPath()
+void CVisuals::PredictPath() // need work
 {
 	if (!cvar.predict_path || !g_Local.bAlive)
 		return;
@@ -437,7 +437,7 @@ void CVisuals::PredictPath()
 		float fScreenEnd[2];
 
 		if (g_Utils.bCalcScreen(vecStepPos, fScreenStart) && g_Utils.bCalcScreen(pmtrace.endpos, fScreenEnd))
-			g_Systems.DrawDebugArrow(fScreenStart[0], fScreenStart[1], fScreenEnd[0], fScreenEnd[1], g_Drawing.redGreenGradiant(i, 150), 255);
+			g_Systems.DrawDebugArrow(fScreenStart[0], fScreenStart[1], fScreenEnd[0], fScreenEnd[1], g_Drawing.redGreenGradiant(i, 400), 255);
 
 		vecStepPos = pmtrace.endpos;
 
@@ -508,8 +508,8 @@ void CVisuals::TraceGrenade()
 			float fScreen[2];
 
 			if (g_Utils.bCalcScreen(vecEnd, fScreen)) {
-				g_pISurface->DrawSetColor((float)cvar.cheat_global_color_r, (float)cvar.cheat_global_color_g, ((float)cvar.cheat_global_color_b - (float)cvar.cheat_global_color_b), (float)60);
-				g_pISurface->DrawFilledRect(fScreen[0] - 3, fScreen[1] - 3, fScreen[0] + 3, fScreen[1] + 3);
+				g_pISurface->DrawSetColor(202, 25, 25, 255);
+				g_pISurface->DrawFilledRect(fScreen[0] - 1, fScreen[1] - 1, fScreen[0] + 1, fScreen[1] + 1);
 			}
 
 			if (pmtrace.plane.normal[2] > 0.9 && vecForward[2] <= 0 && vecForward[2] >= (-1 * flGravity * FLOORSTOP))

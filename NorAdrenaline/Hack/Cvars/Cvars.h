@@ -234,17 +234,11 @@ public:
 	bool air_duck;
 	bool jump_bug;
 	bool fps_boost;
-	bool StrafeDir;
-	bool movement_all;
 
-	///
-	bool teleport_z;
-	bool teleport_spectator;
-	bool teleport_v2;
-	bool lagexploit;
+	bool adjust_speed;
+	float adjust_speed_amount;
 	bool fakelatency;
-	float fakeping_amount;
-	///
+	float fakelatency_amount;
 	
 	bool spam;
 	float spam_timer;

@@ -92,7 +92,6 @@ typedef float TransformMatrix[MAXSTUDIOBONES][3][4];
 
 #define MAX_PLAYER_NAME_LENGTH	32
 
-//color codes
 #define RED(COLORCODE) ((int)(COLORCODE >> 24))
 #define BLUE(COLORCODE) ((int)(COLORCODE >> 8) & 0xFF)
 #define GREEN(COLORCODE) ((int)(COLORCODE >> 16) & 0xFF)
@@ -101,6 +100,7 @@ typedef float TransformMatrix[MAXSTUDIOBONES][3][4];
 
 #define ENTITY(Indx) (g_Engine.GetEntityByIndex(Indx))
 #define IS_VALID(Indx) (ENTITY(Indx) && ENTITY(Indx)->player)
+#define TIME_TO_TICKS(dt) ((int)(0.5f + (float)(dt) / pmove->frametime))
 
 struct CImageTexture
 {

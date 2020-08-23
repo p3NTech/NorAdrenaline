@@ -124,13 +124,13 @@ void CL_CreateMove(float frametime, struct usercmd_s *cmd, int active)
 	{
 		UpdateWeaponData();
 
-		static float circle_yaw = 0.f;
+		static float circle_yaw = g_Local.vEye.y;
 
 		g_Systems.KnifeBot(cmd);
 		g_Systems.BunnyHop(cmd);
 		g_Systems.JumpBug(frametime, cmd);
 		g_Systems.FakeDuck(cmd);
-		g_Systems.air_duck(cmd);
+		g_Systems.AirDuck(cmd);
 		g_Systems.AutoStrafe(cmd);
 		g_Systems.circle_strafe(&circle_yaw, cmd);
 		g_Systems.Fastrun(cmd);
@@ -155,9 +155,21 @@ void CL_CreateMove(float frametime, struct usercmd_s *cmd, int active)
 			g_Engine.pEventAPI->EV_SetTraceHull(2);
 			g_Engine.pEventAPI->EV_PlayerTrace(g_Local.vEye, g_Local.vEye + vForward * 8192, PM_GLASS_IGNORE, -1, &tr);
 			Vector vecEnd = g_Local.vEye + vForward * tr.fraction * 8192;
+
+
 			float fScreen[2];
+			bool behind, behind2;
+
+			g_Visuals.WorldToScreen(vecEnd, fScreen, behind);
+
+			if (behind)
+			{
+				fScreen[0] = g_Screen.iWidth	- fScreen[0];
+				fScreen[1] = g_Screen.iHeight	- fScreen[1];
+			}
+
 			if (g_Utils.bCalcScreen(vecEnd, fScreen)) {
-				g_pISurface->DrawSetColor((float)cvar.cheat_global_color_r, (float)cvar.cheat_global_color_g, (float)cvar.cheat_global_color_b, 255); // wall hitpoint drawing
+				g_pISurface->DrawSetColor((int)cvar.cheat_global_color_r, (int)cvar.cheat_global_color_g, (int)cvar.cheat_global_color_b, 255);
 				g_pISurface->DrawFilledRect(fScreen[0] - 3, fScreen[1] - 3, fScreen[0] + 3, fScreen[1] + 3);
 			}
 			g_Engine.pEfxAPI->R_BeamPoints(g_Local.vEye, tr.endpos, beamindex, 0.3f, 0.4f, 0, 32, 2, 0, 0, cvar.cheat_global_color_r, cvar.cheat_global_color_g, cvar.cheat_global_color_b);
@@ -169,7 +181,7 @@ void CL_CreateMove(float frametime, struct usercmd_s *cmd, int active)
 		g_Misc.AntiAim(cmd);
 		g_Misc.FakeLag(cmd);
 		g_Misc.NameStealer();
-		g_Systems.cem_TransmitBits();
+		g_Systems.AdjustSpeed();
 	}
 
 	g_Misc.Spam();
@@ -312,31 +324,15 @@ void HUD_Frame_init(double time)
 		cvar.gstrafe_standup = false;
 	});
 
-	g_pEngine->pfnAddCommand("na_rand_SteamID", []() {
-		g_Systems.RandomizeSteamID();
-	});
-
-	g_pEngine->pfnAddCommand("na_unban_SteamID", []() {
-		g_Systems.unbanSteamID();
-	});
-
-	g_pEngine->pfnAddCommand("teleport_z", []() {
-		cvar.teleport_z = true;
-	});
-
-	g_pEngine->pfnAddCommand("teleport_spectator", []() {
-		cvar.teleport_spectator = true;
-	});
-
-	g_pEngine->pfnAddCommand("teleport_v2", []() {
-		cvar.teleport_v2 = true;
+	g_pEngine->pfnAddCommand("na_rand_SteamID_Mask", []() {
+		g_Systems.RandomizeSteamIDMask();
 	});
 
 	g_pEngine->pfnAddCommand("+na_speedhack", []() {
-		cvar.lagexploit = true;
+		cvar.adjust_speed = true;
 	});
 	g_pEngine->pfnAddCommand("-na_speedhack", []() {
-		cvar.lagexploit = false;
+		cvar.adjust_speed = false;
 	});
 
 	g_pEngine->pfnAddCommand("+na_fakeduck", []() {
@@ -410,11 +406,6 @@ int HUD_AddEntity(int type, struct cl_entity_s *ent, const char *modelname)
 
 			if (cvar.esp_line_of_sight)
 			{
-				if (tr.fraction != 1.0f)
-				{
-					g_pISurface->DrawSetColor(cvar.cheat_global_color_r, cvar.cheat_global_color_g, cvar.cheat_global_color_b, cvar.esp_alpha);
-					g_pISurface->DrawFilledRect(tr.endpos[0] - 3, tr.endpos[1] - 3, tr.endpos[0] + 3, tr.endpos[1] + 3);
-				}
 				g_Engine.pEfxAPI->R_BeamPoints(vecStart, tr.endpos, beamindex, 0.001f, 0.9f, 0, 32, 2, 0, 0, cvar.esp_line_of_sight_r / 255, cvar.esp_line_of_sight_g / 255, cvar.esp_line_of_sight_b / 255);
 			}
 
@@ -445,14 +436,14 @@ int HUD_AddEntity(int type, struct cl_entity_s *ent, const char *modelname)
 
 void HookUserMessages()
 {
-	pResetHUD = HookUserMsg("ResetHUD", ResetHUD);
-	pBombDrop = HookUserMsg("BombDrop", BombDrop);
-	pBattery = HookUserMsg("Battery", Battery);
-	pHealth = HookUserMsg("Health", Health);
-	pDeathMsg = HookUserMsg("DeathMsg", DeathMsg);
-	pSetFOV = HookUserMsg("SetFOV", SetFOV);
-	pTeamInfo = HookUserMsg("TeamInfo", TeamInfo);
-	pScoreAttrib = HookUserMsg("ScoreAttrib", ScoreAttrib);
+	pResetHUD		= HookUserMsg("ResetHUD", ResetHUD);
+	pBombDrop		= HookUserMsg("BombDrop", BombDrop);
+	pBattery		= HookUserMsg("Battery", Battery);
+	pHealth			= HookUserMsg("Health", Health);
+	pDeathMsg		= HookUserMsg("DeathMsg", DeathMsg);
+	pSetFOV			= HookUserMsg("SetFOV", SetFOV);
+	pTeamInfo		= HookUserMsg("TeamInfo", TeamInfo);
+	pScoreAttrib	= HookUserMsg("ScoreAttrib", ScoreAttrib);
 }
 
 int HUD_GetHullBounds(int hullnum, float* mins, float* maxs)
@@ -474,25 +465,32 @@ void Netchan_TransmitBits(netchan_t *chan, int length, byte *data) {
 	if (g_AimBot.currentTargetIndex == 0)
 		return Netchan_TransmitBits_s(chan, length, data);
 
-	/*
 	//bool isReliable = (uint)chan->incoming_reliable_sequence << 31;
 	bool isReliable = chan->incoming_sequence | ((uint)chan->incoming_reliable_sequence << 31);
 
 	// Process...
 	int instate = chan->incoming_reliable_sequence;
 	int insequencenr = chan->incoming_sequence;
-	// Add lag
-	for (auto &seq : sequences) {
-		int fakepingamount = cvar.fakeping_amount;
-		if (pmove->time - seq.curtime >= fakepingamount) { // fakeping value
-			chan->incoming_reliable_sequence = seq.m_nInReliableState;
-			chan->incoming_sequence = seq.m_nInSequenceNr;
 
-			g_Engine.Con_Printf(">>>>teleport to sequence %d\n", chan->incoming_sequence);
-			break;
+	// Add lag
+	if (cvar.fakelatency)
+	{
+		for (auto& seq : sequences)
+		{
+			int fakepingamount = cvar.fakelatency_amount;
+			if (pmove->time - seq.curtime >= fakepingamount)
+			{
+				chan->incoming_reliable_sequence = seq.m_nInReliableState;
+				chan->incoming_sequence = seq.m_nInSequenceNr;
+
+				if (cvar.debug)
+					g_Engine.Con_Printf(">>>> teleport to sequence %d\n", chan->incoming_sequence);
+
+				break;
+			}
 		}
 	}
-	*/
+
 	// Call original
 	Netchan_TransmitBits_s(chan, length, data);
 
@@ -584,35 +582,33 @@ void StudioEntityLight(struct alight_s *plight) {
 
 void HookClient()
 {
-	g_pClient->HUD_Frame = HUD_Frame_init;
-	g_pClient->HUD_PostRunCmd = HUD_PostRunCmd;
-	g_pClient->HUD_PlayerMoveInit = HUD_PlayerMoveInit;
-	g_pClient->CL_IsThirdPerson = CL_IsThirdPerson;
-	g_pClient->CL_CreateMove = CL_CreateMove;
-	g_pClient->V_CalcRefdef = V_CalcRefdef;
-	g_pClient->HUD_AddEntity = HUD_AddEntity;
-	g_pClient->HUD_GetHullBounds = HUD_GetHullBounds;
-	g_pClient->HUD_ProcessPlayerState = HUD_ProcessPlayerState;
-	g_pClient->HUD_Key_Event = HUD_Key_Event;
+	g_pClient->HUD_Frame				= HUD_Frame_init;
+	g_pClient->HUD_PostRunCmd			= HUD_PostRunCmd;
+	g_pClient->HUD_PlayerMoveInit		= HUD_PlayerMoveInit;
+	g_pClient->CL_IsThirdPerson			= CL_IsThirdPerson;
+	g_pClient->CL_CreateMove			= CL_CreateMove;
+	g_pClient->V_CalcRefdef				= V_CalcRefdef;
+	g_pClient->HUD_AddEntity			= HUD_AddEntity;
+	g_pClient->HUD_GetHullBounds		= HUD_GetHullBounds;
+	g_pClient->HUD_ProcessPlayerState	= HUD_ProcessPlayerState;
+	g_pClient->HUD_Key_Event			= HUD_Key_Event;
 
-	g_pStudio->StudioCheckBBox = StudioCheckBBox;
-	g_pStudio->StudioSetRemapColors = StudioSetRemapColors;
+	g_pStudio->StudioCheckBBox			= StudioCheckBBox;
+	g_pStudio->StudioSetRemapColors		= StudioSetRemapColors;
 
-	g_pEngine->pfnDrawUnicodeCharacter = pfnDrawUnicodeCharacter;
+	g_pEngine->pfnDrawUnicodeCharacter	= pfnDrawUnicodeCharacter;
 
 	HookUserMessages();
 
-	PreS_DynamicSound_s = (PreS_DynamicSound_t)DetourFunction((LPBYTE)g_Offsets.PreS_DynamicSound(), (LPBYTE)&PreS_DynamicSound);
-	CL_Move_s = (CL_Move_t)DetourFunction((LPBYTE)g_Offsets.CL_Move(), (LPBYTE)&CL_Move);
-	Netchan_TransmitBits_s = (Netchan_TransmitBits_t)DetourFunction((LPBYTE)g_Offsets.Netchan_TransmitBits(), (LPBYTE)&Netchan_TransmitBits);
+	PreS_DynamicSound_s							= (PreS_DynamicSound_t)		DetourFunction((LPBYTE)g_Offsets.PreS_DynamicSound(),		(LPBYTE)&PreS_DynamicSound);
+	CL_Move_s									= (CL_Move_t)				DetourFunction((LPBYTE)g_Offsets.CL_Move(),					(LPBYTE)&CL_Move);
+	Netchan_TransmitBits_s						= (Netchan_TransmitBits_t)	DetourFunction((LPBYTE)g_Offsets.Netchan_TransmitBits(),	(LPBYTE)&Netchan_TransmitBits);
 	g_Offsets.EnablePageWrite((DWORD)g_pStudioModelRenderer, sizeof(StudioModelRenderer_t));
-	g_pStudioModelRenderer->StudioRenderModel = StudioRenderModel_Gate;
+	g_pStudioModelRenderer->StudioRenderModel	= StudioRenderModel_Gate;
 	g_Offsets.RestorePageProtection((DWORD)g_pStudioModelRenderer, sizeof(StudioModelRenderer_t));
 
-	// Test stuff
 	r_studio_interface_t* g_pStudioAPI = nullptr;
 	g_pStudioAPI = *(r_studio_interface_t**)g_Offsets.FindPattern("\xC7\xFF\xFF\xFF\xFF\xFF\xF3\xA5\xB9\xFF\xFF\xFF\xFF\xE8\xFF\xFF\xFF\xFF\x5F\xB8\xFF\xFF\xFF\xFF\x5E\xC3", "x?????xxx????x????xx????xx", g_Offsets.client.base, g_Offsets.client.end, 0x2);
-
 
 	if (g_pStudioAPI) {
 		StudioDrawPlayer = g_pStudioAPI->StudioDrawPlayer;

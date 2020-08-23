@@ -1,6 +1,5 @@
 #include "../../Required.h"
 #include "../../../MultiEmulator/MultiEmulator/Source/Emulators/RevEmu2013.h"
-
 #pragma comment(lib, "MultiEmulator.lib")
 
 CSteamIDChanger g_SteamID;
