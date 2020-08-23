@@ -1436,7 +1436,7 @@ void CMenu::Tabs()
 				"Sets name to invisible character."
 			))
 			{
-				g_Engine.PlayerInfo_SetValueForKey("name", func.strToChar("1000101100000"));
+				g_Engine.PlayerInfo_SetValueForKey("name", func.strToChar("100000000011111000000000111110000000001110"));
 			}
 			line_y += 25;
 		}
