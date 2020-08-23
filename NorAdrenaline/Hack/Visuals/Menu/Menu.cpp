@@ -348,32 +348,6 @@ void CMenu::Paint()
 				items[idx].open = bInParams;
 
 				std::vector<std::string> sItems;
-
-				/*
-				std::stringstream b1, b2, b3, b4, b5, b6, b7, b8, b9, b10;
-
-				static const std::string s1		= "name     :";
-				static const std::string s2		= "index    :";
-				static const std::string s3		= "alive    :";
-				static const std::string s4		= "traitor  :";
-				static const std::string s5		= "friend   :";
-				static const std::string s6		= "priority :";
-				static const std::string s7		= "team     :";
-				static const std::string s8		= "weapon   :";
-				static const std::string s9		= "health   :";
-				static const std::string s10	= "distance :";
-
-				b1 << s1 << std::setw(10) << "	" << Player->name;
-				b2 << s2 << std::setw(10) << "	" << idx;
-				b3 << s3 << std::setw(10) << "	" << Player->alive ? "yes" : "no";
-				b4 << s4 << std::setw(10) << "	" << Player->traitor ? "yes" : "no";
-				b5 << s5 << std::setw(10) << "	" << Player->_friend ? "yes" : "no";
-				b6 << s6 << std::setw(10) << "	" << Player->priority ? "yes" : "no";
-				b7 << s7 << std::setw(10) << "	" << Player->team;
-				b8 << s8 << std::setw(10) << "	" << Player->weapon;
-				b9 << s9 << std::setw(10) << "	" << Player->health;
-				b10 << s10 << std::setw(10) << "	" << (int)Player->distance;
-				*/
 				
 				sItems.push_back(format("	name: %s",	Player->name).c_str());
 				sItems.push_back(format("	index: %i",	idx).c_str());
@@ -386,18 +360,6 @@ void CMenu::Paint()
 				sItems.push_back(format("	health: %i",	Player->health).c_str());
 				sItems.push_back(format("	distance: %i",	(int)Player->distance).c_str());
 				sItems.push_back(format("	SteamID: STEAM_0:%llu:%llu", (g_PlayerInfoList[idx].m_nSteamID & 0xFFFFFFFF) & 1, (g_PlayerInfoList[idx].m_nSteamID & 0xFFFFFFFF) >> 1).c_str());
-				/*
-				sItems.push_back(b1.str());
-				sItems.push_back(b2.str());
-				sItems.push_back(b3.str());
-				sItems.push_back(b4.str());
-				sItems.push_back(b5.str());
-				sItems.push_back(b6.str());
-				sItems.push_back(b7.str());
-				sItems.push_back(b8.str());
-				sItems.push_back(b9.str());
-				sItems.push_back(b10.str());
-				*/
 
 				int startFillX, startFillY, endFillX, endFillY, itemX, itemY, Yscaling;
 
@@ -454,7 +416,7 @@ void CMenu::calculate_vectors(bool open, std::vector<std::string> strList, int x
 {
 	// constants
 	static const int scaling = 1;
-	static const int width = 450;
+	static const int width = 560;
 	static const int height = 11;
 
 	// position calc
@@ -1303,7 +1265,7 @@ void CMenu::Tabs()
 			Slider(x + box_indent_x, y + line_y, 0, 6000, cvar.adjust_speed_amount, "Adjust speed amount", true);
 			line_y += 35;
 
-			Checkbox(x + box_indent_x, y + line_y, cvar.fakelatency, " Fake latency");
+			Checkbox(x + box_indent_x, y + line_y, cvar.fakelatency, "Fake latency");
 			line_y += 30;
 
 			Slider(x + box_indent_x, y + line_y, 0, 1000, cvar.fakelatency_amount, "Fake latency amount", true);
@@ -1444,15 +1406,13 @@ void CMenu::Tabs()
 				"Randomize (clientHash) setinfo variable that are some server's using to identify banned players."
 			))
 			{
-				static int _ak, version, len;
+				static int len;
 				static char* str;
 				char cmdstr[256];
 
 				srand(time(NULL));
 
 				len = rand() % 6 + 2;
-				_ak = rand() % 999 + 100;
-				version = rand() % 99999 + 10000;
 
 				str = func.gen_random(len);
 
@@ -1476,7 +1436,7 @@ void CMenu::Tabs()
 				"Sets name to invisible character."
 			))
 			{
-				g_Engine.PlayerInfo_SetValueForKey("name", "ᅠ");
+				g_Engine.PlayerInfo_SetValueForKey("name", func.strToChar("1000101100000"));
 			}
 			line_y += 25;
 		}
