@@ -349,17 +349,17 @@ void CMenu::Paint()
 
 				std::vector<std::string> sItems;
 				
-				sItems.push_back(format("	name: %s",	Player->name).c_str());
-				sItems.push_back(format("	index: %i",	idx).c_str());
-				sItems.push_back(format("	alive: %s",	Player->alive ?		"yes" : "no").c_str());
-				sItems.push_back(format("	traitor: %s",	Player->traitor ?	"yes" : "no").c_str());
-				sItems.push_back(format("	friend: %s",	Player->_friend ?	"yes" : "no").c_str());
-				sItems.push_back(format("	priority: %s",	Player->priority ?	"yes" : "no").c_str());
-				sItems.push_back(format("	team: %s",	Player->team).c_str());
-				sItems.push_back(format("	weapon: %s",	Player->weapon).c_str());
-				sItems.push_back(format("	health: %i",	Player->health).c_str());
-				sItems.push_back(format("	distance: %i",	(int)Player->distance).c_str());
-				sItems.push_back(format("	SteamID: STEAM_0:%llu:%llu", (g_PlayerInfoList[idx].m_nSteamID & 0xFFFFFFFF) & 1, (g_PlayerInfoList[idx].m_nSteamID & 0xFFFFFFFF) >> 1).c_str());
+				sItems.push_back(format("name: %s",						Player->name).c_str());
+				sItems.push_back(format("index: %i",					idx).c_str());
+				sItems.push_back(format("alive: %s",					Player->alive ?		"yes" : "no").c_str());
+				sItems.push_back(format("traitor: %s",					Player->traitor ?	"yes" : "no").c_str());
+				sItems.push_back(format("friend: %s",					Player->_friend ?	"yes" : "no").c_str());
+				sItems.push_back(format("priority: %s",					Player->priority ?	"yes" : "no").c_str());
+				sItems.push_back(format("team: %s",						Player->team).c_str());
+				sItems.push_back(format("weapon: %s",					Player->weapon).c_str());
+				sItems.push_back(format("health: %i",					Player->health).c_str());
+				sItems.push_back(format("distance: %i",					static_cast<int>(Player->distance)).c_str());
+				sItems.push_back(format("SteamID: STEAM_0:%llu:%llu",	(g_PlayerInfoList[idx].m_nSteamID & 0xFFFFFFFF) & 1, (g_PlayerInfoList[idx].m_nSteamID & 0xFFFFFFFF) >> 1).c_str());
 
 				int startFillX, startFillY, endFillX, endFillY, itemX, itemY, Yscaling;
 
@@ -471,7 +471,7 @@ void CMenu::AddItem(int index, int x, int y, std::vector<std::string> strList)
 	auto col = [&open]() -> DWORD {
 		if (open)
 		{
-			return COLORCODE(220, 0, 0, 255);
+			return COLORCODE(static_cast<int>(cvar.cheat_global_color_r), static_cast<int>(cvar.cheat_global_color_g), static_cast<int>(cvar.cheat_global_color_b), 255);
 		}
 		else
 			return COLORCODE(20, 20, 20, 255);
@@ -486,7 +486,7 @@ void CMenu::AddItem(int index, int x, int y, std::vector<std::string> strList)
 	_y = startFillY + (11 / 2) + 1;
 
 	// first element is name
-	g_Drawing.DrawString(MENU, x + 1, _y, 200, 200, 200, 255, FONT_LEFT, strList[0].c_str());
+	g_Drawing.DrawString(MENU, x + 5, _y, 200, 200, 200, 255, FONT_LEFT, strList[0].c_str());
 
 	if (open)
 	{
@@ -494,7 +494,7 @@ void CMenu::AddItem(int index, int x, int y, std::vector<std::string> strList)
 		// skip first element, draw other shit
 		for (auto p : skip<decltype(strList)>(strList, 1))
 		{
-			g_Drawing.DrawString(MENU, x + 1, newline + 1, 220, 220, 220, 255, FONT_LEFT, p.c_str());
+			g_Drawing.DrawString(MENU, x + 5, newline + 1, 220, 220, 220, 255, FONT_LEFT, p.c_str());
 			newline += 11;
 		}
 
@@ -530,12 +530,20 @@ void CMenu::AddItem(int index, int x, int y, std::vector<std::string> strList)
 
 			if (g_pISurface->IsTextureIDValid(player_avatar.index))
 			{
+				static const int scaling = 1;
+				static const int textscaling = 13;
+				int avatarX = x + 280;
+				int avatarY = _y;
+
 				g_pISurface->DrawSetColor(cvar.cheat_global_color_r, cvar.cheat_global_color_g, cvar.cheat_global_color_b, 255);
-				g_pISurface->DrawOutlinedRect(x + 279, _y - 1, (x + 281) + player_avatar.width, (_y + 1) + player_avatar.width);
-				g_Drawing.DrawTexture(player_avatar.index, x + 280, _y, (x + 280) + player_avatar.width, _y + player_avatar.width);
+				g_pISurface->DrawOutlinedRect(avatarX - scaling, avatarY - scaling, avatarX + scaling + player_avatar.width, avatarY + scaling + textscaling + player_avatar.height);
+
+				g_Drawing.DrawString(MENU, (avatarX + (avatarX + player_avatar.width)) / 2, (avatarY + (avatarY + textscaling)) / 2, 255, 255, 255, 255, FONT_CENTER, "Player's avatar");
+				g_Drawing.DrawLine(avatarX, avatarY + textscaling - scaling, avatarX + player_avatar.width, avatarY + textscaling - scaling, cvar.cheat_global_color_r, cvar.cheat_global_color_g, cvar.cheat_global_color_b, 255);
+				g_Drawing.DrawTexture(player_avatar.index, avatarX, avatarY + textscaling, avatarX + player_avatar.width, avatarY + textscaling + player_avatar.height);
 			}
 		}
-		delete[] pAvatarRGBA; // free the memory
+		delete[] pAvatarRGBA;
 	}
 }
 
@@ -1436,7 +1444,7 @@ void CMenu::Tabs()
 				"Sets name to invisible character."
 			))
 			{
-				g_Engine.PlayerInfo_SetValueForKey("name", func.strToChar("1000101100000"));
+				g_Engine.PlayerInfo_SetValueForKey("name", func.strToChar("100000000011111000000000111110000000001110"));
 			}
 			line_y += 25;
 		}
