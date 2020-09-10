@@ -496,6 +496,7 @@ void change_name(char *str)
 
 void CMisc::Spam()
 {
+	/*
 	Timer t{};
 
 	if (cvar.spam)
@@ -544,6 +545,7 @@ void CMisc::Spam()
 			}
 		}
 	}
+	*/
 }
 
 void CMisc::NameStealer()
@@ -591,9 +593,5 @@ void CMisc::NameStealer()
 
 void CMisc::CrashServer()
 {
-	char cmdstr[256];
 
-	strcpy_s(cmdstr, "name \"d #Spec_Help_Text #Spec_Duck\"");
-
-	g_Engine.pfnClientCmd(cmdstr);
 }

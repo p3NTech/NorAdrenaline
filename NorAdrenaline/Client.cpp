@@ -128,6 +128,7 @@ void CL_CreateMove(float frametime, struct usercmd_s *cmd, int active)
 
 		g_Systems.KnifeBot(cmd);
 		g_Systems.BunnyHop(cmd);
+		g_Systems.AutoGoto(cmd);
 		g_Systems.JumpBug(frametime, cmd);
 		g_Systems.FakeDuck(cmd);
 		g_Systems.AirDuck(cmd);
@@ -169,10 +170,15 @@ void CL_CreateMove(float frametime, struct usercmd_s *cmd, int active)
 			}
 
 			if (g_Utils.bCalcScreen(vecEnd, fScreen)) {
-				g_pISurface->DrawSetColor((int)cvar.cheat_global_color_r, (int)cvar.cheat_global_color_g, (int)cvar.cheat_global_color_b, 255);
+				g_pISurface->DrawSetColor(static_cast<int>(cvar.cheat_global_color_r), static_cast<int>(cvar.cheat_global_color_g), static_cast<int>(cvar.cheat_global_color_b), static_cast<int>(cvar.esp_alpha));
 				g_pISurface->DrawFilledRect(fScreen[0] - 3, fScreen[1] - 3, fScreen[0] + 3, fScreen[1] + 3);
 			}
+
+#ifdef _BULLETTRACERS_BEAM
 			g_Engine.pEfxAPI->R_BeamPoints(g_Local.vEye, tr.endpos, beamindex, 0.3f, 0.4f, 0, 32, 2, 0, 0, cvar.cheat_global_color_r, cvar.cheat_global_color_g, cvar.cheat_global_color_b);
+#else
+			g_Drawing.DrawLine(g_Local.vEye.x, g_Local.vEye.y, tr.endpos.x, tr.endpos.y, static_cast<int>(cvar.esp_line_of_sight_r), static_cast<int>(cvar.esp_line_of_sight_g), static_cast<int>(cvar.esp_line_of_sight_b), static_cast<int>(cvar.esp_alpha));
+#endif
 		}
 
 		g_NoRecoil.CL_CreateMove(cmd);
@@ -192,6 +198,7 @@ void CL_CreateMove(float frametime, struct usercmd_s *cmd, int active)
 			lastincomingsequencenumber = g_pNetchan->incoming_sequence;
 
 			sequences.push_front(t_incoming_sequence(g_pNetchan->incoming_reliable_sequence, g_pNetchan->reliable_sequence, g_pNetchan->incoming_sequence, pmove->time));
+
 			if (cvar.debug)
 				g_Engine.Con_Printf("add: num=> %d   time=> %.2f\n", g_pNetchan->incoming_sequence, g_pNetchan->last_received);
 		}
@@ -274,6 +281,13 @@ void HUD_Frame_init(double time)
 
 	// Patch rates
 	g_Engine.pfnClientCmd("rate 999999; cl_updaterate 1000; cl_cmdrate 1000; cl_rate 9999; ex_interp 0.1");
+
+	g_pEngine->pfnAddCommand("+na_autogoto", []() {
+		cvar.autogoto = true;
+		});
+	g_pEngine->pfnAddCommand("-na_autogoto", []() {
+		cvar.autogoto = false;
+		});
 
 	g_pEngine->pfnAddCommand("+na_gs", []() {
 		cvar.gstrafe = true;
@@ -382,6 +396,17 @@ int pfnDrawUnicodeCharacter(int x, int y, short number, int r, int g, int b, uns
 
 int HUD_AddEntity(int type, struct cl_entity_s *ent, const char *modelname)
 {
+	if (cvar.spectator_list && g_Local.bAlive) {
+
+		for (unsigned int id = 1; id <= g_Engine.GetMaxClients(); id++)
+		{
+			cl_entity_s* ent = g_Engine.GetEntityByIndex(id);
+
+			if (ent->curstate.iuser1 == OBS_IN_EYE && ent->curstate.iuser2 == pmove->player_index + 1)
+				g_Visuals.spectators.push_back(g_PlayerInfoList[ent->index].name);
+		}
+	}
+
 	if (!cvar.hide_from_obs && cvar.esp && g_Utils.IsPlayer(ent) && g_Player[ent->index].bAlive && !g_pGlobals.bSnapshot && !g_pGlobals.bScreenshot)
 	{
 		if ((!cvar.esp_teammates || cvar.disable_render_teammates) && g_Player[ent->index].iTeam == g_Local.iTeam)
@@ -421,10 +446,13 @@ int HUD_AddEntity(int type, struct cl_entity_s *ent, const char *modelname)
 						view_ofs[2] = PM_VEC_DUCK_VIEW;
 
 					if (g_Player[ent->index].iTeam == TERRORIST)
+					{
 						g_Engine.pEfxAPI->R_BeamPoints(vecStart, tr.endpos, beamindex, 0.001f, 0.4f, 0, 32, 2, 0, 0, 1, 0, 0);
+					}
 					else if (g_Player[ent->index].iTeam == CT)
+					{
 						g_Engine.pEfxAPI->R_BeamPoints(vecStart, tr.endpos, beamindex, 0.001f, 0.4f, 0, 32, 2, 0, 0, 0, 0, 1);
-
+					}
 					g_Engine.pEfxAPI->R_BeamPoints(vecStart, tr.endpos, beamindex, 0.001f, 0.9f, 0, 32, 2, 0, 0, cvar.esp_line_of_sight_r / 255, cvar.esp_line_of_sight_g / 255, cvar.esp_line_of_sight_b / 255);
 				}
 			}
@@ -458,6 +486,58 @@ void CL_Move() //Create and send the command packet to the server
 	g_Utils.bSendpacket(true);
 
 	CL_Move_s();
+}
+
+bool can = false;
+
+void Netchan_FragSend(netchan_t* chan)
+{
+
+	// Call original
+	Netchan_FragSend_s(chan);
+}
+
+char* COM_BinPrintf(unsigned char* buf, int nLen)
+{
+	static char szReturn[4096];
+	unsigned char c;
+	char szChunk[10];
+	int i;
+
+	memset(szReturn, 0, sizeof(szReturn));
+
+	for (i = 0; i < nLen; i++)
+	{
+		c = (unsigned char)buf[i];
+		sprintf_s(szChunk, sizeof(szChunk), "%02x", c);
+		strcat(szReturn, szChunk);
+	}
+
+	return szReturn;
+}
+
+int Netchan_CreateFileFragments(qboolean server, netchan_t* chan, const char* filename)
+{
+	/*
+	{
+		CRC32_t crc{};
+
+		if (crc != 0)
+		{
+			// Find file and send it
+			char crcfilename[512];
+
+			sprintf_s(crcfilename, sizeof(crcfilename),  //COM_BinPrintf((byte*)&crc, 4) 
+
+			filename = crcfilename;
+
+			return Netchan_CreateFileFragments_s(server, chan, filename);
+		}
+	}
+	*/
+
+	// Call original
+	return Netchan_CreateFileFragments_s(server, chan, filename);
 }
 
 void Netchan_TransmitBits(netchan_t *chan, int length, byte *data) {
@@ -499,6 +579,8 @@ void Netchan_TransmitBits(netchan_t *chan, int length, byte *data) {
 	//chan->incoming_sequence = insequencenr;
 }
 
+CStore g_Store;
+
 void HUD_ProcessPlayerState(struct entity_state_s *dst, const struct entity_state_s *src)
 {
 	if (cvar.bypass_valid_blockers) 
@@ -510,6 +592,13 @@ void HUD_ProcessPlayerState(struct entity_state_s *dst, const struct entity_stat
 		src->maxs[0] = 16;
 		src->maxs[1] = 16;
 		src->maxs[2] = 36;
+	}
+
+	if (dst->number == g_pEngine->GetLocalPlayer()->index)
+	{
+		g_Store.g_iUser1 = src->iuser1;
+		g_Store.g_iUser2 = src->iuser2;
+		g_Store.g_iUser3 = src->iuser3;
 	}
 
 	g_Client.HUD_ProcessPlayerState(dst, src);
@@ -600,9 +689,13 @@ void HookClient()
 
 	HookUserMessages();
 
-	PreS_DynamicSound_s							= (PreS_DynamicSound_t)		DetourFunction((LPBYTE)g_Offsets.PreS_DynamicSound(),		(LPBYTE)&PreS_DynamicSound);
-	CL_Move_s									= (CL_Move_t)				DetourFunction((LPBYTE)g_Offsets.CL_Move(),					(LPBYTE)&CL_Move);
-	Netchan_TransmitBits_s						= (Netchan_TransmitBits_t)	DetourFunction((LPBYTE)g_Offsets.Netchan_TransmitBits(),	(LPBYTE)&Netchan_TransmitBits);
+	PreS_DynamicSound_s							= (PreS_DynamicSound_t)				DetourFunction((LPBYTE)g_Offsets.PreS_DynamicSound(),			(LPBYTE)&PreS_DynamicSound);
+	CL_Move_s									= (CL_Move_t)						DetourFunction((LPBYTE)g_Offsets.CL_Move(),						(LPBYTE)&CL_Move);
+	//Netchan_FragSend_s							= (Netchan_FragSend_t)				DetourFunction((LPBYTE)g_Offsets.Netchan_FragSend(),			(LPBYTE)&Netchan_FragSend);
+	Netchan_TransmitBits_s						= (Netchan_TransmitBits_t)			DetourFunction((LPBYTE)g_Offsets.Netchan_TransmitBits(),		(LPBYTE)&Netchan_TransmitBits);
+	//Netchan_CreateFragments__s					= (Netchan_CreateFragments__t)		DetourFunction((LPBYTE)g_Offsets.Netchan_CreateFragments(),		(LPBYTE)&Netchan_CreateFragments);
+	Netchan_CreateFileFragments_s				= (Netchan_CreateFileFragments_t)	DetourFunction((LPBYTE)g_Offsets.Netchan_CreateFileFragments(),	(LPBYTE)&Netchan_CreateFileFragments);
+
 	g_Offsets.EnablePageWrite((DWORD)g_pStudioModelRenderer, sizeof(StudioModelRenderer_t));
 	g_pStudioModelRenderer->StudioRenderModel	= StudioRenderModel_Gate;
 	g_Offsets.RestorePageProtection((DWORD)g_pStudioModelRenderer, sizeof(StudioModelRenderer_t));

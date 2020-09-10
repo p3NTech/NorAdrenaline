@@ -1445,6 +1445,9 @@ bool IsCurWeaponC4(void)
 
 bool CanAttack(void)
 {
+	if (!cvar.aim_bullet_time)
+		return true;
+
 	if (g_Local.weapon.m_flNextPrimaryAttack <= 0.0 && !g_Local.weapon.m_iInReload && g_Local.weapon.m_flNextAttack <= 0.0)
 		return true;
 

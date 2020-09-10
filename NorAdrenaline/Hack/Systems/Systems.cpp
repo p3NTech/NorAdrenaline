@@ -202,6 +202,7 @@ Vector CSystems::VischeckCorner(int iPlayer1, int iPlayer2, float maxdist, bool 
 	return { 0, 0, 0 };
 }
 
+// TODO: finish
 bool CSystems::VisCheckEntFromEnt(int iPlayer1, int iPlayer2)
 {
 	auto player1 = ENTITY(iPlayer1);
@@ -212,6 +213,7 @@ bool CSystems::VisCheckEntFromEnt(int iPlayer1, int iPlayer2)
 	return true; //g_Visuals.GetAmountOfPlayerVisible(source, player2);
 }
 
+// TODO: finish
 bool CSystems::VisCheckEntFromEntVector(int iPlayer, Vector targetVector)
 {
 	auto player1 = ENTITY(iPlayer);
@@ -408,9 +410,8 @@ bool CSystems::PhysicsApplyFriction(Vector &in, Vector &out, float flSurfaceFric
 	return true;
 }
 
-void CSystems::DrawDebugArrow(const float x0, const float y0, const float x1, const float y1, const DWORD color, const int alpha)
+void CSystems::DrawDebugArrow(const float x0, const float y0, const float x1, const float y1, const DWORD color, const int size)
 {
-	float size = 10.0f;
 	QAngle angRotation;
 	Vector from = { x0, y0, NULL };
 	Vector to	= { x1, y1, NULL };
@@ -418,8 +419,10 @@ void CSystems::DrawDebugArrow(const float x0, const float y0, const float x1, co
 	Vector vecForward, vecRight, vecUp;
 	g_Engine.pfnAngleVectors(angRotation, vecForward, vecRight, vecUp);
 
-	g_Drawing.DrawLine(from.x, from.y, to.x, to.y, RED(color), GREEN(color), BLUE(color), alpha);
-	g_Drawing.DrawLine(from.x, from.y, from.x - vecRight.x * size, from.y - vecRight.y * size, RED(color), GREEN(color), BLUE(color), alpha);
+	g_Drawing.DrawLine(from.x, from.y, to.x, to.y, RED(color), GREEN(color), BLUE(color), ALPHA(color));
+
+	if (size != 0)
+		g_Drawing.DrawLine(from.x, from.y, from.x - vecRight.x * size, from.y - vecRight.y * size, RED(color), GREEN(color), BLUE(color), ALPHA(color));
 }
 
 void ComputeMove(int id, float forwardmove, float sidemove)
@@ -459,7 +462,7 @@ std::pair<float, float> CSystems::ComputeMove(const Vector &a, const Vector &b, 
 	Vector diff = (b - a);
 
 	if (diff.Length() == 0)
-		return { 0, 0 };
+		return { (float)0, (float)0 };
 
 	const float x = diff.x;
 	const float y = diff.y;
@@ -506,11 +509,59 @@ void CSystems::WalkTo(const Vector &vector, struct usercmd_s *cmd)
 	cmd->sidemove = result.second;
 }
 
-void CSystems::MoveTo(const Vector &vector, CBaseLocal *ent, struct usercmd_s *cmd)
+void CSystems::MoveTo(struct cl_entity_s *ent, struct usercmd_s *cmd)
 {
-	auto result = ComputeMove(ent->vOrigin, vector, cmd);
-	cmd->forwardmove = result.first;
-	cmd->sidemove = result.second;
+	auto result = ComputeMove(g_Local.vOrigin, ent->origin, cmd);
+	cmd->forwardmove	= result.first;
+	cmd->sidemove		= result.second;
+}
+
+void CSystems::AutoGoto(struct usercmd_s* cmd)
+{
+	if (!cvar.autogoto)
+		return;
+
+	float m_flBestDist = FLT_MAX;
+	unsigned int target = 0;
+
+	for (int i = 1; i <= g_Engine.GetMaxClients(); i++)
+	{
+		if (i == g_Local.iIndex)
+			continue;
+
+		if (!cvar.aim_teammates && g_Player[i].iTeam == g_Local.iTeam)
+			continue;
+
+		if (!g_Player[i].bAlive)
+			continue;
+
+		if (!g_Player[i].bVisible)
+			continue;
+
+		if (g_Player[i].flDist < m_flBestDist)
+		{
+			m_flBestDist = g_Player[i].flDist;
+			target = i;
+		}
+	}
+
+	if (IS_VALID(target))
+	{
+		auto target_vec = ENTITY(target)->origin;
+		auto local_vec = g_Local.vOrigin;
+
+		if ((target_vec - local_vec).Length() != 40)
+		{
+			if (cvar.autogoto_adjust_speed)
+			{
+				int val = cvar.adjust_speed_amount;
+				int in = val * 20;
+
+				func.AdjustSpeed(in);
+			}
+			MoveTo(ENTITY(target), cmd);
+		}
+	}
 }
 
 void CSystems::KnifeBot(struct usercmd_s *cmd)
@@ -553,9 +604,30 @@ void CSystems::KnifeBot(struct usercmd_s *cmd)
 
 			int fDidHit = FALSE;
 
-			Vector vecPlayerOrigin = ent->origin + g_Player[id].vVelocity * g_Player[id].flFrametime;
+			Vector targetVec = Vector();
 
-			if (vecPlayerOrigin.Distance(pmove->origin) < 64)
+			switch ((int)cvar.knifebot_aim_hitbox) // "Origin", "Head"
+			{
+				case 1:
+				{
+					targetVec = ent->origin;
+					break;
+				}
+				case 2:
+				{
+					targetVec = g_PlayerExtraInfoList[ent->index].vHitbox[11];
+					break;
+				}
+			}
+
+			double hitDist = (cvar.knifebot_attack1 ? 68 : (cvar.knifebot_aim_hitbox == 1 ? (64 - 5.908722) : 64));
+
+			Vector vecPlayerOrigin = targetVec + g_Player[id].vVelocity * g_Player[id].flFrametime;
+			Vector vecLocalPredictedOrigin = g_Local.vEye + (g_Local.vVelocity * g_Local.flFrametime);
+
+			// TODO: Latency prediction, nolerp
+
+			if (vecPlayerOrigin.Distance(vecLocalPredictedOrigin) < hitDist)
 			{
 				// hit
 				fDidHit = TRUE;
@@ -564,7 +636,7 @@ void CSystems::KnifeBot(struct usercmd_s *cmd)
 
 				Vector vecForwardPlayer, vecForward;
 
-				Vector vecSrc = g_Local.vEye;
+				Vector vecSrc = vecLocalPredictedOrigin;
 
 				QAngle QAimAngle;
 
@@ -590,7 +662,13 @@ void CSystems::KnifeBot(struct usercmd_s *cmd)
 				{
 					g_Utils.MakeAngle(false, QAimAngle, cmd);
 
-					cmd->buttons |= IN_ATTACK2;
+					if (!cvar.knifebot_silent)
+						g_Engine.SetViewAngles(QAimAngle);
+
+					if (cvar.knifebot_attack1)
+						cmd->buttons |= IN_ATTACK;
+					else
+						cmd->buttons |= IN_ATTACK2;
 				}
 			}
 		}
@@ -1220,10 +1298,8 @@ void CSystems::AdjustSpeed()
 	if (cvar.adjust_speed)
 	{
 		int val = cvar.adjust_speed_amount;
-		int in = val * 10;
+		int in = val * 20;
 
 		func.AdjustSpeed(in);
-		g_pNetchan.last_reliable_sequence	= in;
-		g_pNetchan.outgoing_sequence		= in;
 	}
 }

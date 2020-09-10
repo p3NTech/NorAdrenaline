@@ -45,29 +45,30 @@ void CFollowBot::checkAFK()
 	}
 }
 
-void CFollowBot::addCrumbs(int targetIndx, vec3_t corner = g_Local.vOrigin)
+void CFollowBot::addCrumbs(int targetIndx, vec3_t corner = g_Local.vFootOrigin)
 {
 	vec3_t ref;
 
 	breadcrumbs.clear();
 
     auto target = ENTITY(targetIndx);
+    auto target_origin = FOOT_ORIGIN(target);
 
-	if (g_Local.vOrigin != corner)
+	if (g_Local.vFootOrigin != corner)
 	{
-		vec3_t dist = corner - g_Local.vOrigin;
+		vec3_t dist = corner - g_Local.vFootOrigin;
 
-		int maxiterations = floor(corner.DistTo(g_Local.vOrigin)) / 40;
+		int maxiterations = floor(corner.DistTo(g_Local.vFootOrigin)) / 40;
 
 		for (int i = 0; i < maxiterations; i++)
 		{
-			breadcrumbs.push_back(g_Local.vOrigin + dist / ref.vectorMax(ref.vectorAbs(dist)) * 40.0f * (i + 1));
+			breadcrumbs.push_back(g_Local.vFootOrigin + dist / ref.vectorMax(ref.vectorAbs(dist)) * 40.0f * (i + 1));
 		}
 	}
 
-	vec3_t dist = target->origin - corner;
+	vec3_t dist = target_origin - corner;
 
-	int maxiterations = floor(corner.DistTo(target->origin)) / 40;
+	int maxiterations = floor(corner.DistTo(target_origin)) / 40;
 
 	for (int i = 0; i < maxiterations; i++)
 	{
@@ -84,13 +85,15 @@ void CFollowBot::addCrumbPair(int Iplayer1, int Iplayer2, std::pair<Vector, Vect
 
     auto player1 = ENTITY(Iplayer1);
     auto player2 = ENTITY(Iplayer2);
+    auto p1_origin = FOOT_ORIGIN(player1);
+    auto p2_origin = FOOT_ORIGIN(player2);
 
     {
-        Vector dist = (corner1 - player1->origin);
-        int maxiterations = floor(corner1.DistTo(player1->origin)) / 40;
+        Vector dist = (corner1 - p1_origin);
+        int maxiterations = floor(corner1.DistTo(p1_origin)) / 40;
         for (int i = 0; i < maxiterations; i++)
         {
-            breadcrumbs.push_back(player1->origin + dist / ref.vectorMax(ref.vectorAbs(dist)) * 40.0f * (i + 1));
+            breadcrumbs.push_back(p1_origin + dist / ref.vectorMax(ref.vectorAbs(dist)) * 40.0f * (i + 1));
         }
     }
     {
@@ -102,8 +105,8 @@ void CFollowBot::addCrumbPair(int Iplayer1, int Iplayer2, std::pair<Vector, Vect
         }
     }
     {
-        Vector dist = player2->origin - corner2;
-        int maxiterations = floor(corner2.DistTo(player2->origin)) / 40;
+        Vector dist = p2_origin - corner2;
+        int maxiterations = floor(corner2.DistTo(p2_origin)) / 40;
         for (int i = 0; i < maxiterations; i++)
         {
             breadcrumbs.push_back(corner2 + dist / ref.vectorMax(ref.vectorAbs(dist)) * 40.0f * (i + 1));
@@ -158,7 +161,7 @@ void CFollowBot::Draw()
 	if (!cvar.Followbot || !cvar.Followbot_draw)
 		return;
 
-	if (breadcrumbs.size() < 2)
+	if (breadcrumbs.empty())
 		return;
 
     float vecBottom[2], vecTop[2];
@@ -171,38 +174,33 @@ void CFollowBot::Draw()
         {
             if (behind)
             {
-                vecTop[0] = g_Screen.iWidth - vecTop[0];
-                vecTop[1] = g_Screen.iHeight - vecTop[1];
+                vecTop[0] = g_Screen.iWidth     - vecTop[0];
+                vecTop[1] = g_Screen.iHeight    - vecTop[1];
             }
 
             if (behind2)
             {
-                vecBottom[0] = g_Screen.iWidth - vecBottom[0];
+                vecBottom[0] = g_Screen.iWidth  - vecBottom[0];
                 vecBottom[1] = g_Screen.iHeight - vecBottom[1];
             }
 
-            g_Drawing.DrawLine(vecTop[0], vecTop[1], vecBottom[0], vecBottom[1], 255, 255, 255, 255);
+            g_Drawing.DrawLine(vecTop[0], vecTop[1], vecBottom[0], vecBottom[1], 222, 222, 222, static_cast<int>(cvar.esp_alpha));
         }
 	}
 
-    float vecBottom1[2], vecTop1[2];
-    bool behind1, behind3;
+    float vecTop1[2];
+    bool behind1;
 
-    if (g_Visuals.WorldToScreen(breadcrumbs[0], vecTop1, behind1) && g_Visuals.WorldToScreen(breadcrumbs[0], vecBottom1, behind3))
+    if (g_Visuals.WorldToScreen(breadcrumbs[0], vecTop1, behind1))
     {
         if (behind1)
         {
-            vecTop1[0] = g_Screen.iWidth - vecTop1[0];
-            vecTop1[1] = g_Screen.iHeight - vecTop1[1];
+            vecTop1[0] = g_Screen.iWidth    - vecTop1[0];
+            vecTop1[1] = g_Screen.iHeight   - vecTop1[1];
         }
 
-        if (behind3)
-        {
-            vecBottom1[0] = g_Screen.iWidth - vecBottom1[0];
-            vecBottom1[1] = g_Screen.iHeight - vecBottom1[1];
-        }
-        g_Drawing.DrawRect(vecTop1[0] - 4, vecTop1[1] - 4, 8, 8, 255, 255, 255, 255);
-        g_Drawing.DrawOutlinedRect(vecTop1[0] - 4, vecTop1[1] - 4, 7, 7, 255, 255, 255, 255);
+        g_Drawing.DrawRect(vecTop1[0] - 4, vecTop1[1] - 4, 8, 8, 100, 0, 0, static_cast<int>(cvar.esp_alpha));
+        g_Drawing.DrawOutlinedRect(vecTop1[0] - 4, vecTop1[1] - 4, 7, 7, 255, 0, 0, static_cast<int>(cvar.esp_alpha));
     }
 }
 
@@ -227,8 +225,11 @@ void CFollowBot::CM(struct usercmd_s* cmd)
     if (!cvar.Followbot || !g_Local.bAlive)
     {
         follow_target = 0;
+        breadcrumbs.clear();
+        crouch_timer.update();
         return;
     }
+
     if (!inited)
         Init();
 
@@ -251,7 +252,7 @@ void CFollowBot::CM(struct usercmd_s* cmd)
         crouch_timer.update();
     }
 
-    bool foundPreferredTarget = false;
+    bool foundTarget = false;
 
     // Target Selection
     if (cvar.Followbot_friends)
@@ -259,31 +260,37 @@ void CFollowBot::CM(struct usercmd_s* cmd)
         auto& valid_target = follow_target;
         auto ent_count = g_Engine.GetMaxClients();
 
-        if (cvar.Followbot_friends && !foundPreferredTarget)
+        if (!foundTarget)
         {
-            if (!g_Player[valid_target].bFriend)
+            for (int i = 1; i <= ent_count; i++)
             {
-                for (int i = 1; i <= ent_count; i++)
-                {
-                    auto entity = ENTITY(i);
-                    auto index = entity->index;
+                auto index = ENTITY(i)->index;
 
-                    if (!isValidTarget(index))
-                        continue;
-                    if (g_Player[index].iTeam != g_Local.iTeam)
-                        continue;
-                    if (!g_Player[index].bFriend)
-                        continue;
-                    if (startFollow(index))
-                    {
-                        follow_target = index;
-                        foundPreferredTarget = true;
-                        break;
-                    }
+                if (!isValidTarget(index))
+                    continue;
+                if (g_Player[index].iTeam != g_Local.iTeam)
+                    continue;
+                if (!g_Player[index].bFriend)
+                    continue;
+
+                if (startFollow(index))
+                {
+                    follow_target = index;
+                    foundTarget = true;
+                    break;
                 }
             }
-            else
-                foundPreferredTarget = true;
+        }
+        else
+        {
+            // target found
+            // update
+
+            if (!g_Player[valid_target].bFriend)
+            {
+                follow_target = 0;
+                foundTarget = false;
+            }
         }
     }
 
@@ -292,20 +299,21 @@ void CFollowBot::CM(struct usercmd_s* cmd)
         crouch_timer.update();
     }
 
-    auto *followtar = ENTITY(follow_target);
+    auto followtarget = ENTITY(follow_target);
+    auto followtar_origin = FOOT_ORIGIN(followtarget);
 
-    if (!IS_VALID(followtar->index) || !g_Player[followtar->index].bAlive)
+    if (!IS_VALID(followtarget->index) || !g_Player[followtarget->index].bAlive)
     {
         follow_target = 0;
         return;
     }
 
     // Crouch logic
-    bool ducked = g_Player[followtar->index].bDucked;
+    bool ducked = g_Player[followtarget->index].bDucked;
 
     if (!ducked)
         crouch_timer.update();
-    else if (crouch_timer.check(500))
+    else if (crouch_timer.check(200))
         cmd->buttons |= IN_DUCK;
 
     if (cvar.Followbot_afk)
@@ -319,15 +327,16 @@ void CFollowBot::CM(struct usercmd_s* cmd)
 
     // Update timer on new target
     static Timer idle_time{};
+
     if (breadcrumbs.empty())
         idle_time.update();
 
-    auto tar_orig = followtar->origin;
-    auto loc_orig = g_Local.vOrigin;
+    auto tar_orig = followtar_origin;
+    auto loc_orig = g_Local.vFootOrigin;
     auto dist_to_target = loc_orig.DistTo(tar_orig);
 
     // If the player is close enough, we dont need to follow the path
-    if ((dist_to_target < (float)cvar.Followbot_distance) && g_Systems.VisCheckEntFromEnt(g_Local.iIndex, followtar->index))
+    if ((dist_to_target < cvar.Followbot_distance) && g_Systems.VisCheckEntFromEnt(g_Local.iIndex, followtarget->index))
     {
         idle_time.update();
     }
@@ -345,7 +354,7 @@ void CFollowBot::CM(struct usercmd_s* cmd)
     }
 
     // New crumbs, we add one if its empty so we have something to follow
-    if (breadcrumbs.empty() || (tar_orig.DistTo(breadcrumbs.at(breadcrumbs.size() - 1)) > 40.0F && g_Systems.VectorialDistanceToGround(ENTITY(follow_target)->origin) < 45))
+    if (breadcrumbs.empty() || (tar_orig.DistTo(breadcrumbs.at(breadcrumbs.size() - 1)) > 40.0F && g_Systems.VectorialDistanceToGround(followtar_origin) < 45))
         breadcrumbs.push_back(tar_orig);
 
     if (dist_to_target > cvar.Followbot_distance)

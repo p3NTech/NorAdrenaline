@@ -10,12 +10,13 @@ public:
 	int aim_key;
 	bool aim_teammates;
 	bool aim_delay_shot;
+	bool aim_aa_resolver;
+	bool aim_bullet_time;
 	float aim_target_selection;
 	float aim_hitbox;
 	float aim_multi_point;
 	bool aim_penetration;
-	bool aim_silent;
-	bool aim_perfect_silent;
+	float aim_method;
 	bool aim_autoscope;
 	float aim_fov;
 	float aim_hschance;
@@ -208,11 +209,27 @@ public:
 	float cheat_global_color_g;
 	float cheat_global_color_b;
 
+	float friend_color_r;
+	float friend_color_g;
+	float friend_color_b;
+
+	float priority_color_r;
+	float priority_color_g;
+	float priority_color_b;
+
 	bool bunnyhop;
 	bool fakeduck;
 	bool knifebot;
+	bool knifebot_silent;
+	float knifebot_dist;
+	float knifebot_aim_hitbox;
+	bool knifebot_attack1;
+	bool autogoto;
+	bool autogoto_adjust_speed;
 
 	bool TTT;
+
+	bool spectator_list;
 
 	bool Followbot;
 	bool Followbot_draw;
@@ -296,6 +313,8 @@ public:
 	DWORD rainbow(float val);
 	std::string hexify(unsigned int n);
 	char* strToChar(const char* str);
+	const char* ConvertToUTF8(const wchar_t* pStr);
+	void toClipboard(const std::string& s);
 	void DrawCircle(int x, int y, int r);
 };
 extern CFunctions func;

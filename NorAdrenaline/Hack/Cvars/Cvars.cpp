@@ -13,12 +13,13 @@ void CCvars::Init()
 
 	aim_teammates = false;
 	aim_delay_shot = false;
+	aim_aa_resolver = false;
+	aim_bullet_time = false;
 	aim_target_selection = 3;
 	aim_hitbox = 1;
 	aim_multi_point = 0;
 	aim_penetration = false;
-	aim_silent = false;
-	aim_perfect_silent = false;
+	aim_method = 1;
 	aim_autoscope = false;
 	aim_fov = 1;
 	aim_hschance = 33;
@@ -103,7 +104,7 @@ void CCvars::Init()
 	esp_sound = false;
 	esp_health = false;
 
-	esp_alpha = 200;
+	esp_alpha = 255;
 
 	esp_line_of_sight = false;
 
@@ -206,9 +207,25 @@ void CCvars::Init()
 	cheat_global_color_g = 14;
 	cheat_global_color_b = 14;
 
+	friend_color_r = 0;
+	friend_color_g = 200;
+	friend_color_b = 150;
+
+	priority_color_r = 200;
+	priority_color_g = 0;
+	priority_color_b = 150;
+
 	bunnyhop = false;
 	fakeduck = false;
 	knifebot = false;
+	knifebot_silent = false;
+	knifebot_dist = 64;
+	knifebot_aim_hitbox = 1;
+	knifebot_attack1 = false;
+	autogoto = false;
+	autogoto_adjust_speed = false;
+
+	spectator_list = false;
 
 	TTT = false;
 
@@ -337,12 +354,15 @@ void CFunctions::SaveCvars()
 	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "aim", dtoa(s, cvar.aim));
 	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "aim_teammates", dtoa(s, cvar.aim_teammates));
 	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "aim_delay_shot", dtoa(s, cvar.aim_delay_shot));
+
+	if (cvar.aim_method != 3)
+		g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "aim_bullet_time", dtoa(s, cvar.aim_bullet_time));
+
 	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "aim_target_selection", dtoa(s, cvar.aim_target_selection));
 	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "aim_hitbox", dtoa(s, cvar.aim_hitbox));
 	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "aim_multi_point", dtoa(s, cvar.aim_multi_point));
 	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "aim_penetration", dtoa(s, cvar.aim_penetration));
-	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "aim_silent", dtoa(s, cvar.aim_silent));
-	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "aim_perfect_silent", dtoa(s, cvar.aim_perfect_silent));
+	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "aim_method", dtoa(s, cvar.aim_method));
 	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "aim_autoscope", dtoa(s, cvar.aim_autoscope));
 	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "aim_fov", dtoa(s, cvar.aim_fov));
 	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "aim_key", dtoa(s, cvar.aim_key));
@@ -525,12 +545,14 @@ void CFunctions::SaveCvars()
 	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "menu_key", dtoa(s, cvar.menu_key));
 
 	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "bunnyhop", dtoa(s, cvar.bunnyhop));
-	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "auto strafe", dtoa(s, cvar.autostrafe));
-	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "ground strafe bunnyhop", dtoa(s, cvar.gstrafe_bhop));
-	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "bhop noslowdown", dtoa(s, cvar.bhop_nsd));
-	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "ground strafe standup", dtoa(s, cvar.gstrafe_standup));;
-	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "jump bug", dtoa(s, cvar.jump_bug));
+	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "autostrafe", dtoa(s, cvar.autostrafe));
+	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "gstrafe_bhop", dtoa(s, cvar.gstrafe_bhop));
+	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "bhop_nsd", dtoa(s, cvar.bhop_nsd));
+	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "gstrafe_standup", dtoa(s, cvar.gstrafe_standup));;
+	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "jump_bug", dtoa(s, cvar.jump_bug));
 	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "knifebot", dtoa(s, cvar.knifebot));
+	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "autogoto", dtoa(s, cvar.autogoto));
+	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "autogoto_adjust_speed", dtoa(s, cvar.autogoto_adjust_speed));
 	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "name_stealer", dtoa(s, cvar.name_stealer));
 
 	g_Utils.cIniWrite(g_pGlobals.IniPath, Section, "fake_latency_amount", dtoa(s, cvar.fakelatency_amount));
@@ -591,13 +613,13 @@ void CFunctions::LoadCvars()
 
 	cvar.aim = atoi(g_Utils.cIniRead(g_pGlobals.IniPath, Section, "aim", "0"));
 	cvar.aim_delay_shot = atoi(g_Utils.cIniRead(g_pGlobals.IniPath, Section, "aim_delay_shot", "0"));
+	cvar.aim_bullet_time = atoi(g_Utils.cIniRead(g_pGlobals.IniPath, Section, "aim_bullet_time", "0"));
 	cvar.aim_teammates = atoi(g_Utils.cIniRead(g_pGlobals.IniPath, Section, "aim_teammates", "0"));
 	cvar.aim_target_selection = atoi(g_Utils.cIniRead(g_pGlobals.IniPath, Section, "aim_target_selection", "0"));
 	cvar.aim_hitbox = atoi(g_Utils.cIniRead(g_pGlobals.IniPath, Section, "aim_hitbox", "0"));
 	cvar.aim_multi_point = atoi(g_Utils.cIniRead(g_pGlobals.IniPath, Section, "aim_multi_point", "0"));
 	cvar.aim_penetration = atoi(g_Utils.cIniRead(g_pGlobals.IniPath, Section, "aim_penetration", "0"));
-	cvar.aim_silent = atoi(g_Utils.cIniRead(g_pGlobals.IniPath, Section, "aim_silent", "0"));
-	cvar.aim_perfect_silent = atoi(g_Utils.cIniRead(g_pGlobals.IniPath, Section, "aim_perfect_silent", "0"));
+	cvar.aim_method = atoi(g_Utils.cIniRead(g_pGlobals.IniPath, Section, "aim_method", "0"));
 	cvar.aim_autoscope = atoi(g_Utils.cIniRead(g_pGlobals.IniPath, Section, "aim_autoscope", "0"));
 	cvar.aim_key = atoi(g_Utils.cIniRead(g_pGlobals.IniPath, Section, "aim_key", "-1"));
 	cvar.aim_fov = atof(g_Utils.cIniRead(g_pGlobals.IniPath, Section, "aim_fov", "0"));
@@ -787,8 +809,13 @@ void CFunctions::LoadCvars()
 
 	cvar.bunnyhop = atoi(g_Utils.cIniRead(g_pGlobals.IniPath, Section, "bunnyhop", "0"));
 	cvar.knifebot = atoi(g_Utils.cIniRead(g_pGlobals.IniPath, Section, "knifebot", "0"));
+	cvar.autogoto = atoi(g_Utils.cIniRead(g_pGlobals.IniPath, Section, "autogoto", "0"));
+	cvar.autogoto_adjust_speed = atoi(g_Utils.cIniRead(g_pGlobals.IniPath, Section, "autogoto_adjust_speed", "0"));
+
+	// add followbot cvars, im lazy
 
 	cvar.bhop_nsd = atoi(g_Utils.cIniRead(g_pGlobals.IniPath, Section, "bhop_nsd", "0"));
+	cvar.jump_bug = atoi(g_Utils.cIniRead(g_pGlobals.IniPath, Section, "jump_bug", "0"));
 	cvar.gstrafe_bhop = atoi(g_Utils.cIniRead(g_pGlobals.IniPath, Section, "gstrafe_bhop", "0"));
 	cvar.gstrafe_standup = atoi(g_Utils.cIniRead(g_pGlobals.IniPath, Section, "gstrafe_standup", "0"));
 	cvar.fakelatency_amount = atof(g_Utils.cIniRead(g_pGlobals.IniPath, Section, "fake_latency_amount", "0"));
@@ -932,6 +959,31 @@ char* CFunctions::strToChar(const char* str)
 		}
 	}
 	return &parsed;
+}
+
+const char* CFunctions::ConvertToUTF8(const wchar_t* pStr)
+{
+	static char szBuf[1024];
+	WideCharToMultiByte(CP_UTF8, 0, pStr, -1, szBuf, sizeof(szBuf), NULL, NULL);
+	return szBuf;
+}
+
+void CFunctions::toClipboard(const std::string& s)
+{
+	OpenClipboard(0);
+	EmptyClipboard();
+	const size_t len = strlen(s.c_str()) + 1;
+	HGLOBAL hg = GlobalAlloc(GMEM_MOVEABLE, len);
+	if (!hg)
+	{
+		CloseClipboard();
+		return;
+	}
+	memcpy(GlobalLock(hg), s.c_str(), len);
+	GlobalUnlock(hg);
+	SetClipboardData(CF_TEXT, hg);
+	CloseClipboard();
+	GlobalFree(hg);
 }
 
 void CFunctions::DrawCircle(int x, int y, int r)

@@ -4,30 +4,35 @@
 
 #pragma comment(lib, "ws2_32.lib")
 
-IVGuiModuleLoader* g_pIVGuiModuleLoader = nullptr;
-IRunGameEngine* g_pIRunGameEngine = nullptr;
-IGameUI* g_pGameUI = nullptr;
-IGameConsole* g_pConsole = nullptr;
-vgui::IPanel* g_pIPanel = nullptr;
-vgui::ISurface* g_pISurface = nullptr;
-vgui::IEngineVGui* g_pIEngineVGui = nullptr;
-cl_clientfunc_t *g_pClient = nullptr;
-cl_clientfunc_t g_Client;
-cl_enginefunc_t *g_pEngine = nullptr;
-cl_enginefunc_t g_Engine;
-engine_studio_api_t *g_pStudio = nullptr;
-engine_studio_api_t g_Studio;
-playermove_t *pmove = nullptr;
-UserMsg pUserMsgBase = nullptr;
-Snapshot_t Snapshot_s = nullptr;
-Screenshot_t Screenshot_s = nullptr;
-CL_Move_t CL_Move_s = nullptr;
-PreS_DynamicSound_t PreS_DynamicSound_s = nullptr;
-StudioModelRenderer_t g_StudioModelRenderer;
-StudioModelRenderer_t* g_pStudioModelRenderer = nullptr;
-Netchan_TransmitBits_t Netchan_TransmitBits_s = nullptr;
+IVGuiModuleLoader*			g_pIVGuiModuleLoader		= nullptr;
+IRunGameEngine*				g_pIRunGameEngine			= nullptr;
+IGameUI*					g_pGameUI					= nullptr;
+IGameConsole*				g_pConsole					= nullptr;
+vgui::IPanel*				g_pIPanel					= nullptr;
+vgui::ISurface*				g_pISurface					= nullptr;
+vgui::IEngineVGui*			g_pIEngineVGui				= nullptr;
+cl_clientfunc_t*			g_pClient					= nullptr;
+cl_clientfunc_t				g_Client;
+cl_enginefunc_t*			g_pEngine					= nullptr;
+cl_enginefunc_t				g_Engine;
+engine_studio_api_t*		g_pStudio					= nullptr;
+engine_studio_api_t			g_Studio;
+playermove_t*				pmove						= nullptr;
+UserMsg						pUserMsgBase				= nullptr;
+Snapshot_t					Snapshot_s					= nullptr;
+Screenshot_t				Screenshot_s				= nullptr;
+CL_Move_t					CL_Move_s					= nullptr;
+PreS_DynamicSound_t			PreS_DynamicSound_s			= nullptr;
+StudioModelRenderer_t		g_StudioModelRenderer;
+StudioModelRenderer_t*		g_pStudioModelRenderer		= nullptr;
 
-ISteamInterface g_SteamInterface;
+Netchan_FragSend_t				Netchan_FragSend_s				= nullptr;
+Netchan_TransmitBits_t			Netchan_TransmitBits_s			= nullptr;
+Netchan_CreateFileFragments_t	Netchan_CreateFileFragments_s	= nullptr;
+
+IFileSystem*				g_pFileSystem;
+ISteamInterface				g_SteamInterface;
+
 VHookTable PanelHook;
 
 LRESULT CALLBACK Hooked_WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -987,42 +992,75 @@ BOOL License()
 	return 1;
 }
 
+char* Sys_GetLongPathName(void)
+{
+	char szShortPath[MAX_PATH];
+	static char szLongPath[MAX_PATH];
+	char* pszPath;
+
+	szShortPath[0] = 0;
+	szLongPath[0] = 0;
+
+	if (GetModuleFileName(NULL, szShortPath, sizeof(szShortPath)))
+	{
+		GetLongPathName(szShortPath, szLongPath, sizeof(szLongPath));
+		pszPath = strrchr(szLongPath, '\\');
+
+		if (pszPath[0])
+			pszPath[1] = 0;
+
+		size_t len = strlen(szLongPath);
+
+		if (len > 0)
+		{
+			if (szLongPath[len - 1] == '\\' || szLongPath[len - 1] == '/')
+				szLongPath[len - 1] = 0;
+		}
+	}
+
+	return szLongPath;
+}
+
 DWORD WINAPI Hook(LPVOID lpThreadParameter)
 {
-	CreateInterfaceFn gameui_factory	= CaptureFactory("gameui.dll");
-	CreateInterfaceFn vgui2_factory		= CaptureFactory("vgui2.dll");
-	CreateInterfaceFn hardware_factory	= CaptureFactory("hw.dll");
-	CreateInterfaceFn client_factory	= CaptureFactory("client.dll");
-	CreateInterfaceFn steam_factory		= CaptureFactory("steamclient.dll");
+	CreateInterfaceFn gameui_factory		= CaptureFactory("gameui.dll");
+	CreateInterfaceFn vgui2_factory			= CaptureFactory("vgui2.dll");
+	CreateInterfaceFn hardware_factory		= CaptureFactory("hw.dll");
+	CreateInterfaceFn client_factory		= CaptureFactory("client.dll");
+	CreateInterfaceFn filesystem_factory	= CaptureFactory("FileSystem_Stdio.dll");
+	CreateInterfaceFn steam_factory			= CaptureFactory("steamclient.dll");
 
-	if (gameui_factory && vgui2_factory && hardware_factory && client_factory && steam_factory)
+	if (gameui_factory && vgui2_factory && hardware_factory && client_factory && filesystem_factory && steam_factory)
 	{
 		VIRTUALIZER_START
 		while (!g_Offsets.FindHardware())
 			Sleep(100);
 
-		g_pIVGuiModuleLoader	= (IVGuiModuleLoader*)	(CaptureInterface(gameui_factory,	VGUIMODULELOADER_INTERFACE_VERSION));
-		g_pIRunGameEngine		= (IRunGameEngine*)		(CaptureInterface(gameui_factory,	RUNGAMEENGINE_INTERFACE_VERSION));
-		g_pGameUI				= (IGameUI*)			(CaptureInterface(gameui_factory,	GAMEUI_INTERFACE_VERSION));
-		g_pConsole				= (IGameConsole*)		(CaptureInterface(gameui_factory,	GAMECONSOLE_INTERFACE_VERSION));
-		g_pIPanel				= (vgui::IPanel*)		(CaptureInterface(vgui2_factory,	VGUI_PANEL_INTERFACE_VERSION));
-		g_pISurface				= (vgui::ISurface*)		(CaptureInterface(hardware_factory, VGUI_SURFACE_INTERFACE_VERSION));
-		g_pIEngineVGui			= (vgui::IEngineVGui*)	(CaptureInterface(hardware_factory, VENGINE_VGUI_VERSION));
+		g_pFileSystem = (IFileSystem*)(CaptureInterface(filesystem_factory, FILESYSTEM_INTERFACE_VERSION));
+		g_pFileSystem->Mount();
+		g_pFileSystem->AddSearchPath(Sys_GetLongPathName(), "ROOT");
 
-		g_SteamInterface.steamclient = (ISteamClient017*)(CaptureInterface(steam_factory, STEAM_CLIENT_VERSION));
+		g_pIVGuiModuleLoader			= (IVGuiModuleLoader*)	(CaptureInterface(gameui_factory,		VGUIMODULELOADER_INTERFACE_VERSION));
+		g_pIRunGameEngine				= (IRunGameEngine*)		(CaptureInterface(gameui_factory,		RUNGAMEENGINE_INTERFACE_VERSION));
+		g_pGameUI						= (IGameUI*)			(CaptureInterface(gameui_factory,		GAMEUI_INTERFACE_VERSION));
+		g_pConsole						= (IGameConsole*)		(CaptureInterface(gameui_factory,		GAMECONSOLE_INTERFACE_VERSION));
+		g_pIPanel						= (vgui::IPanel*)		(CaptureInterface(vgui2_factory,		VGUI_PANEL_INTERFACE_VERSION));
+		g_pISurface						= (vgui::ISurface*)		(CaptureInterface(hardware_factory,		VGUI_SURFACE_INTERFACE_VERSION));
+		g_pIEngineVGui					= (vgui::IEngineVGui*)	(CaptureInterface(hardware_factory,		VENGINE_VGUI_VERSION));
+		g_SteamInterface.steamclient	= (ISteamClient017*)	(CaptureInterface(steam_factory,		STEAM_CLIENT_VERSION));
+		
+		HSteamPipe hNewPipe				= g_SteamInterface.steamclient->CreateSteamPipe();
+		HSteamUser hNewUser				= g_SteamInterface.steamclient->ConnectToGlobalUser(hNewPipe);
 
-		HSteamPipe hNewPipe = g_SteamInterface.steamclient->CreateSteamPipe();
-		HSteamUser hNewUser = g_SteamInterface.steamclient->ConnectToGlobalUser(hNewPipe);
+		g_SteamInterface.steamfriends	= reinterpret_cast<ISteamFriends015*>			(g_SteamInterface.steamclient->GetISteamFriends		(hNewUser, hNewPipe,	STEAMFRIENDS_INTERFACE_VERSION_015));
+		g_SteamInterface.steamuser		= reinterpret_cast<ISteamUser017*>				(g_SteamInterface.steamclient->GetISteamUser		(hNewUser, hNewPipe,	STEAMUSER_INTERFACE_VERSION_017));
+		g_SteamInterface.steamuserStats = reinterpret_cast<ISteamUserStats011*>			(g_SteamInterface.steamclient->GetISteamUserStats	(hNewUser, hNewPipe,	STEAMUSERSTATS_INTERFACE_VERSION_011));
+		g_SteamInterface.steamutils		= reinterpret_cast<ISteamUtils007*>				(g_SteamInterface.steamclient->GetISteamUtils		(hNewUser,				STEAMUTILS_INTERFACE_VERSION_007));
 
-		g_SteamInterface.steamfriends		= reinterpret_cast<ISteamFriends015*>		(g_SteamInterface.steamclient->GetISteamFriends		(hNewUser, hNewPipe, STEAMFRIENDS_INTERFACE_VERSION_015));
-		g_SteamInterface.steamuser			= reinterpret_cast<ISteamUser017*>			(g_SteamInterface.steamclient->GetISteamUser		(hNewUser, hNewPipe, STEAMUSER_INTERFACE_VERSION_017));
-		g_SteamInterface.steamuserStats		= reinterpret_cast<ISteamUserStats011*>		(g_SteamInterface.steamclient->GetISteamUserStats	(hNewUser, hNewPipe, STEAMUSERSTATS_INTERFACE_VERSION_011));
-		g_SteamInterface.steamutils			= reinterpret_cast<ISteamUtils007*>			(g_SteamInterface.steamclient->GetISteamUtils		(hNewUser, STEAMUTILS_INTERFACE_VERSION_007));
-
-		g_pClient = (cl_clientfunc_t*)g_Offsets.FindClient();
-		g_pEngine = (cl_enginefunc_t*)g_Offsets.FindEngine();
-		g_pStudio = (engine_studio_api_t*)g_Offsets.FindStudio();
-		g_pStudioModelRenderer = (StudioModelRenderer_t*)g_Offsets.FindStudioModelRenderer();
+		g_pClient						= (cl_clientfunc_t*)		g_Offsets.FindClient();
+		g_pEngine						= (cl_enginefunc_t*)		g_Offsets.FindEngine();
+		g_pStudio						= (engine_studio_api_t*)	g_Offsets.FindStudio();
+		g_pStudioModelRenderer			= (StudioModelRenderer_t*)	g_Offsets.FindStudioModelRenderer();
 
 		/*if (License())
 		{

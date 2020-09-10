@@ -104,6 +104,115 @@ DWORD COffsets::PreS_DynamicSound(void)
 	return Address;
 }
 
+void hexArrayToStr(unsigned char* info, unsigned int infoLength, char** buffer)
+{
+	const char* pszNibbleToHex = { "0123456789ABCDEF" };
+	int nNibble, i;
+	if (infoLength > 0)
+	{
+		if (info != NULL)
+		{
+			*buffer = (char*)malloc((infoLength * 2) + 1);
+			buffer[0][(infoLength * 2)] = 0;
+			for (i = 0; i < infoLength; i++)
+			{
+				nNibble = info[i] >> 4;
+				buffer[0][2 * i] = pszNibbleToHex[nNibble];
+				nNibble = info[i] & 0x0F;
+				buffer[0][2 * i + 1] = pszNibbleToHex[nNibble];
+			}
+		}
+		else
+		{
+			*buffer = NULL;
+		}
+	}
+	else
+	{
+		*buffer = NULL;
+	}
+}
+
+std::string hexStr(BYTE* data, int len)
+{
+	char buff[256];
+	std::stringstream ss;
+	ss << std::hex;
+
+	for (int i(0); i < len; ++i)
+		ss << format("%02X%s", (int)data[i], (i + 1) % 16 == 0 ? "\r\n" : " ").c_str();
+
+	return ss.str();
+}
+
+void DebugFunc(const DWORD adr, const char* funcName)
+{
+	if (cvar.debug)
+		g_pConsole->DPrintf("( %s ) found at: [ %s]\n", funcName, hexStr((PBYTE)adr, sizeof(DECIMAL)).c_str());
+}
+
+DWORD COffsets::Netchan_FragSend(void)
+{
+	DWORD Address = FindPattern("\xE8\xFF\xFF\xFF\xFF\x8B\x53\x6C", "x????xxx", hardware.base, hardware.end, 0);
+
+	if (FarProc(Address, hardware.base, hardware.end))
+		Error(("%s: not found.", (__FUNCTION__)), true);
+
+	DebugFunc(Address, __FUNCTION__);
+
+	return Address;
+}
+
+DWORD COffsets::Netchan_CreateFragments(void)
+{
+	DWORD Address = FindPattern("\xE8\xFF\xFF\xFF\xFF\x83\xC4\x0C\xC7\x46\xFF\xFF\xFF\xFF\xFF\x8B\x4D\x10", "x????xxxxx?????xxx", hardware.base, hardware.end, 0);
+
+	if (FarProc(Address, hardware.base, hardware.end))
+		Error(("%s: not found.", (__FUNCTION__)), true);
+
+	DebugFunc(Address, __FUNCTION__);
+
+	return Address;
+}
+
+DWORD COffsets::Netchan_CreateFileFragments(void)
+{
+	DWORD Address = FindPattern("Warning:  Unable to open %s for transfer", hardware.base, hardware.end, 0);
+	Address = FindReference(hardware.base, hardware.end, Address) - 0x5B;
+
+	if (FarProc(Address, hardware.base, hardware.end))
+		Error(("%s: not found.", (__FUNCTION__)), true);
+
+	int limit = 0;
+
+	while (*(PBYTE)Address == 0x90)
+	{
+		Address += 0x1;
+		limit += 1;
+		if (limit > 30) break;
+	}
+
+	DebugFunc(Address, __FUNCTION__);
+
+	return Address;
+}
+
+void COffsets::Call_CL_ProcessFile(void) // idk
+{
+	static DWORD c = FindPattern("\xE8\xFF\xFF\xFF\xFF\x83\xC4\x08\x83\x3D\xFF\xFF\xFF\xFF\xFF", "x????xxxxx?????", hardware.base, hardware.end, 0);
+
+	static const bool successfully_received = false;
+	const char* str = { "custom.hpk" };
+
+	__asm
+	{
+		push str;
+		push 0;
+		call c;
+		add esp, 0x8;
+	}
+}
+
 DWORD COffsets::Netchan_TransmitBits(void) {
 	DWORD Address = FindPattern("%s:Outgoing message overflow", hardware.base, hardware.end, 0);
 	Address = FindReference(hardware.base, hardware.end, Address) - 0x5B;
@@ -118,6 +227,8 @@ DWORD COffsets::Netchan_TransmitBits(void) {
 		limit += 1;
 		if (limit > 30) break;
 	}
+
+	DebugFunc(Address, __FUNCTION__);
 
 	return Address;
 }
@@ -228,6 +339,12 @@ bool COffsets::FindHardware(void)
 		return false;
 
 	if (!FindModuleByName("vgui2.dll", &vgui2))
+		return false;
+
+	if (!FindModuleByName("FileSystem_Stdio.dll", &FileSystem_Stdio))
+		return false;
+
+	if (!FindModuleByName("steamclient.dll", &steamclient))
 		return false;
 
 	return true;

@@ -254,6 +254,8 @@ void CVisuals::Run()
 	TraceGrenade();
 	PredictPath();
 
+	SpectatorList();
+
 	g_TraitorDetection.Draw();
 	g_FollowBot.Draw();
 
@@ -287,26 +289,32 @@ void CVisuals::DrawAimBotFOV()
 		positions[1] = (y + (dy * g_Local.vNoRecoilAngle[0]));
 
 		func.DrawCircle(positions[0], positions[1], radius);
-
-		//g_Drawing.DrawCircle(positions, cvar.aim_fov * 3.25, radius, cvar.draw_aim_fov_r, cvar.draw_aim_fov_g, cvar.draw_aim_fov_b, cvar.esp_alpha);
 	}
 }
 
 void CVisuals::TraceAnglesESP(unsigned int i) {
-	if (!cvar.esp_trace_angles || g_Player[i].iTeam == g_Local.iTeam)
+
+	if (!cvar.esp_trace_angles)
 		return;
 
-	Vector vForward;
-	Vector vAngle = g_Player[i].vAngles;
+	if (!cvar.esp_teammates && g_Player[i].iTeam == g_Local.iTeam)
+		return;
 
-	g_Engine.pfnAngleVectors(vAngle, vForward, NULL, NULL);
-	int beamindex = g_Engine.pEventAPI->EV_FindModelIndex("sprites/laserbeam.spr");
+	Vector vecStart, vecEnd, vecForward;
+
 	pmtrace_t tr;
+
+	vecStart = g_PlayerExtraInfoList[i].vHitbox[11];
+
+	g_Engine.pfnAngleVectors(g_Player[i].vAngles, vecForward, NULL, NULL);
+
+	vecEnd = vecStart + vecForward * 8192;
+
 	g_Engine.pEventAPI->EV_SetTraceHull(2);
-	g_Engine.pEventAPI->EV_PlayerTrace(g_Player[i].vOrigin, g_Player[i].vOrigin + vForward * 8192, PM_GLASS_IGNORE, -1, &tr);
+	g_Engine.pEventAPI->EV_PlayerTrace(vecStart, vecEnd, PM_GLASS_IGNORE, -1, &tr);
 
 	float flScreen1[2], flScreen2[2];
-	if (g_Utils.bCalcScreen(g_Player[i].vOrigin, flScreen1) &&
+	if (g_Utils.bCalcScreen(vecStart, flScreen1) &&
 		g_Utils.bCalcScreen(tr.endpos, flScreen2))
 	{
 		g_Drawing.DrawLine(flScreen1[0], flScreen1[1], flScreen2[0], flScreen2[1], 255, 255, 255, 255);
@@ -317,8 +325,8 @@ void CVisuals::RemoveScope()
 {
 	if (g_Local.bScoped && cvar.remove_scope)
 	{
-		g_Engine.pfnTintRGBA(1, g_Screen.iHeight / 2, g_Screen.iWidth, 1, cvar.cheat_global_color_r, cvar.cheat_global_color_g, cvar.cheat_global_color_b, 130);
-		g_Engine.pfnTintRGBA(g_Screen.iWidth / 2, 1, 1, g_Screen.iHeight, cvar.cheat_global_color_r, cvar.cheat_global_color_g, cvar.cheat_global_color_b, 130);
+		g_Engine.pfnTintRGBA(1, g_Screen.iHeight / 2, g_Screen.iWidth, 1, static_cast<int>(cvar.cheat_global_color_r), static_cast<int>(cvar.cheat_global_color_g), static_cast<int>(cvar.cheat_global_color_b), 100);
+		g_Engine.pfnTintRGBA(g_Screen.iWidth / 2, 1, 1, g_Screen.iHeight, static_cast<int>(cvar.cheat_global_color_r), static_cast<int>(cvar.cheat_global_color_g), static_cast<int>(cvar.cheat_global_color_b), 100);
 	}
 }
 
@@ -361,8 +369,6 @@ void CVisuals::PenetrationInfo()
 
 				iPenetration--;
 			}
-
-			int beamindex = g_Engine.pEventAPI->EV_FindModelIndex("sprites/laserbeam.spr");
 
 			if (iWalls > 0)
 			{
@@ -409,35 +415,42 @@ void CVisuals::PredictPath() // need work
 	if (!cvar.predict_path || !g_Local.bAlive)
 		return;
 
-	auto sv_gravity = g_Engine.pfnGetCvarFloat("sv_gravity");
-
+	const float offset		= 1.0f;
+	const float standFeet	= 34.0f - offset;
+	const float crouchFeet	= 14.0f - offset;
 	Vector		vecVelocity = pmove->velocity;
 	bool		bIsOnGround = pmove->flags & FL_ONGROUND;
 	Vector	vecWorldGravity = { 0, 0, -pmove->gravity * g_Systems.GetEntityGravity() * pmove->frametime * pmove->frametime };
-	Vector       vecStepPos = pmove->origin;
+
+	Vector       vecStepPos = g_Local.vFootOrigin;
 
 	pmtrace_t pmtrace;
 
-	vecVelocity *= pmove->frametime;
+	float flTimeAlive;
+	float flStep = (TIMEALIVE / NUMBLOOPS);
 
-	for (int i = 0; i < 400; ++i) 
+	vecVelocity *= 400;
+
+	for (flTimeAlive = 0; flTimeAlive < TIMEALIVE; flTimeAlive += flStep)
 	{
+
 		g_Engine.pEventAPI->EV_SetTraceHull((pmove->flags & FL_DUCKING) ? 1 : 0);
 		g_Engine.pEventAPI->EV_PlayerTrace(vecStepPos, vecStepPos + vecVelocity, PM_GLASS_IGNORE | PM_STUDIO_BOX, g_Local.iIndex, &pmtrace);
 
 		if (pmtrace.startsolid)
 			break;
 
-		if (pmtrace.fraction != 1.0f)
+		if (pmtrace.fraction < 1.0f)
 		{
 			g_Systems.PhysicsClipVelocity(vecVelocity, pmtrace.plane.normal, vecVelocity, 1.0f);
+			flTimeAlive -= (flStep * (1 - pmtrace.fraction));
 		}
 
 		float fScreenStart[2];
 		float fScreenEnd[2];
 
 		if (g_Utils.bCalcScreen(vecStepPos, fScreenStart) && g_Utils.bCalcScreen(pmtrace.endpos, fScreenEnd))
-			g_Systems.DrawDebugArrow(fScreenStart[0], fScreenStart[1], fScreenEnd[0], fScreenEnd[1], g_Drawing.redGreenGradiant(i, 400), 255);
+			g_Systems.DrawDebugArrow(fScreenStart[0], fScreenStart[1], fScreenEnd[0], fScreenEnd[1], g_Drawing.redGreenGradiant(flTimeAlive, 400), 0);
 
 		vecStepPos = pmtrace.endpos;
 
@@ -534,7 +547,7 @@ void CVisuals::TraceGrenade()
 		float fScreenEnd[2];
 
 		if (g_Utils.bCalcScreen(vecStart, fScreenStart) && g_Utils.bCalcScreen(vecEnd, fScreenEnd))
-			g_Systems.DrawDebugArrow(fScreenStart[0], fScreenStart[1], fScreenEnd[0], fScreenEnd[1], COLORCODE(30, 175, 240, 255), 255);
+			g_Systems.DrawDebugArrow(fScreenStart[0], fScreenStart[1], fScreenEnd[0], fScreenEnd[1], COLORCODE(255, 255, 255, static_cast<int>(cvar.esp_alpha)), 0);
 
 		vecStart = vecEnd;
 
@@ -590,11 +603,114 @@ void CVisuals::SoundESP()
 							color.r = 100; color.g = 200; color.b = 160;
 						}
 
-						g_Drawing.DrawBox(screen[0] - size, screen[1] - size, 10, 10, color.r, color.g, color.b, 255);
+						g_Drawing.DrawBox(screen[0] - size, screen[1] - size, 10, 10, color.r, color.g, color.b, static_cast<int>(cvar.esp_alpha));
 					}
 				}
 			}
 		}
+	}
+}
+
+void CVisuals::SpectatorList()
+{
+	if (!cvar.spectator_list)
+		return;
+
+	int newline = 175;
+
+	if ( spectators.size() > 0 )
+	{
+		g_Drawing.DrawString(ESP, g_Screen.iWidth / 100, (g_Screen.iHeight / 100) + newline, 205, 25, 25, cvar.esp_alpha, FONT_LEFT, "Spectating me:");
+		newline += 15;
+
+		for (auto v : spectators)
+		{
+			g_Drawing.DrawString(ESP, g_Screen.iWidth / 100, (g_Screen.iHeight / 100) + newline, 240, 240, 240, cvar.esp_alpha, FONT_LEFT, "%s", v.c_str());
+			newline += 15;
+		}
+	}
+
+	/*
+	int w = g_Screen.iWidth / 100;
+
+	static const int numElems = 9;
+	static const int newlineSpacing = 13;
+	static const int wideSpacing = 105;
+
+	g_Drawing.DrawString(ESP, (g_Screen.iWidth / 100), (g_Screen.iHeight / 100) + 160, 240, 0, 20, cvar.esp_alpha, FONT_LEFT, "Spectating me:");
+
+	for (auto v : spectators) {
+
+		int newline = 175;
+
+		auto strings = split_string(v.c_str(), "\n");
+
+		for (auto itr = strings.begin(); itr != strings.end(); itr++)
+		{
+			std::string pString = *itr;
+
+			g_Drawing.DrawString(ESP, (g_Screen.iWidth / 100) + w, (g_Screen.iHeight / 100) + newline, 240, 240, 240, cvar.esp_alpha, FONT_LEFT, "%s", pString.c_str());
+
+			if (w > 1790)
+			{
+				w = g_Screen.iWidth / 100;
+				newline += (numElems * newlineSpacing) + newlineSpacing;
+			}
+			else
+				newline += newlineSpacing;
+		}
+		w += wideSpacing;
+	}
+	*/
+
+	spectators.clear();
+}
+
+void ScreenStrings(int x, int y, std::vector<std::string> elem, int newlineSpacing, int sideSpacing)
+{
+	static const int maxW = g_Screen.iWidth;
+	static const int maxH = g_Screen.iHeight;
+
+	static const int spacingX = 10;
+	static const int spacingY = 10;
+
+	int startX = maxW;
+	int startY = maxH;
+
+	for (auto v : elem)
+	{
+		int w, h;
+		g_Drawing.GetTextSize(w, h, MENU, v.c_str());
+
+		if (y < spacingY)
+		{
+			startY = spacingY;
+		}
+		else if ((y + h) > maxH)
+		{
+			startY = spacingY;
+		}
+
+		if (x < spacingX)
+		{
+			startX = spacingX;
+		}
+		else if ((x + w) > maxW)
+		{
+			startY += h;
+			startX = spacingX;
+		}
+
+		auto strings = split_string(v.c_str(), "\n");
+
+		for (auto itr = strings.begin(); itr != strings.end(); itr++)
+		{
+			std::string pString = *itr;
+
+			g_Drawing.DrawString(ESP, startX, startY, 240, 240, 240, cvar.esp_alpha, FONT_LEFT, "%s", pString.c_str());
+
+		}
+		startX += w;
 	}
 }
 
@@ -616,44 +732,59 @@ void CVisuals::PlayerESP(unsigned int i)
 
 	byte r = 0, g = 0, b = 0;
 
-	if (!g_Player[i].bFriend)
+	if (!g_Player[i].bFriend && !g_Player[i].bPriority)
 	{
-		if (g_Player[i].iTeam == TERRORIST)
+		switch (g_Player[i].iTeam)
 		{
-			if (g_Player[i].bVisible)
+			case TERRORIST:
 			{
-				r = cvar.esp_box_t_vis_r;
-				g = cvar.esp_box_t_vis_g;
-				b = cvar.esp_box_t_vis_b;
+				if (g_Player[i].bVisible)
+				{
+					r = cvar.esp_box_t_vis_r;
+					g = cvar.esp_box_t_vis_g;
+					b = cvar.esp_box_t_vis_b;
+					break;
+				}
+				else
+				{
+					r = cvar.esp_box_t_invis_r;
+					g = cvar.esp_box_t_invis_g;
+					b = cvar.esp_box_t_invis_b;
+					break;
+				}
+				break;
 			}
-			else
+			case CT:
 			{
-				r = cvar.esp_box_t_invis_r;
-				g = cvar.esp_box_t_invis_g;
-				b = cvar.esp_box_t_invis_b;
-			}
-		}
-		else if (g_Player[i].iTeam == CT)
-		{
-			if (g_Player[i].bVisible)
-			{
-				r = cvar.esp_box_ct_vis_r;
-				g = cvar.esp_box_ct_vis_g;
-				b = cvar.esp_box_ct_vis_b;
-			}
-			else
-			{
-				r = cvar.esp_box_ct_invis_r;
-				g = cvar.esp_box_ct_invis_g;
-				b = cvar.esp_box_ct_invis_b;
+				if (g_Player[i].bVisible)
+				{
+					r = cvar.esp_box_ct_vis_r;
+					g = cvar.esp_box_ct_vis_g;
+					b = cvar.esp_box_ct_vis_b;
+					break;
+				}
+				else
+				{
+					r = cvar.esp_box_ct_invis_r;
+					g = cvar.esp_box_ct_invis_g;
+					b = cvar.esp_box_ct_invis_b;
+					break;
+				}
+				break;
 			}
 		}
 	}
-	else if (g_Player[i].bTraitor)
+	else if (g_Player[i].bFriend)
 	{
-		r = cvar.esp_box_friends_r;
-		g = cvar.esp_box_friends_g;
-		b = cvar.esp_box_friends_b;
+		r = cvar.friend_color_r;
+		g = cvar.friend_color_g;
+		b = cvar.friend_color_b;
+	}
+	else if (g_Player[i].bPriority)
+	{
+		r = cvar.priority_color_r;
+		g = cvar.priority_color_g;
+		b = cvar.priority_color_b;
 	}
 
 	Vector Top = Vector(ent->origin.x, ent->origin.y, ent->origin.z + ent->curstate.mins.z);
@@ -671,7 +802,7 @@ void CVisuals::PlayerESP(unsigned int i)
 		float box_width = box_height * 0.3f;
 
 		if (cvar.esp_box)
-			g_Drawing.DrawPlayerBox(ScreenTop[0], ScreenTop[1], box_width, box_height, r, g, b, 255);
+			g_Drawing.DrawPlayerBox(ScreenTop[0], ScreenTop[1], box_width, box_height, r, g, b, static_cast<int>(cvar.esp_alpha));
 
 		char *szWeapon = g_PlayerExtraInfoList[i].szWeaponName;
 
@@ -746,7 +877,7 @@ void CVisuals::PlayerESP(unsigned int i)
 					unsigned int x1 = ScreenTop[0] + (w / 2);
 					unsigned int y1 = y0 + h;
 
-					g_Drawing.DrawTexture(texture, x0, y0, x1, y1, cvar.esp_weapon_r, cvar.esp_weapon_g, cvar.esp_weapon_b, 255);
+					g_Drawing.DrawTexture(texture, x0, y0, x1, y1, cvar.esp_weapon_r, cvar.esp_weapon_g, cvar.esp_weapon_b, static_cast<int>(cvar.esp_alpha));
 				}
 				else goto default_draw_weapon;
 			}
@@ -754,7 +885,7 @@ void CVisuals::PlayerESP(unsigned int i)
 			default_draw_weapon:
 				unsigned int y = ScreenBot[1] + (8 - _h);
 
-				g_Drawing.DrawString(ESP, ScreenTop[0], y, 255, 255, 255, 255, FONT_CENTER, "%s", szWeapon);
+				g_Drawing.DrawString(ESP, ScreenTop[0], y, 255, 255, 255, cvar.esp_alpha, FONT_CENTER, "%s", szWeapon);
 			}
 		}
 
@@ -820,43 +951,43 @@ void CVisuals::PlayerESP(unsigned int i)
 
 			g_Utils.bCalcScreen(g_PlayerExtraInfoList[i].vHitboxPoints[11][0], flScreenHead);
 			g_Utils.bCalcScreen(g_PlayerExtraInfoList[i].vHitboxPoints[11][2], flScreenHead2);
-			g_Drawing.DrawLine(flScreenHead[0], flScreenHead[1], flScreenHead2[0], flScreenHead2[1], 0, 255, 0, 255);
+			g_Drawing.DrawLine(flScreenHead[0], flScreenHead[1], flScreenHead2[0], flScreenHead2[1], 0, 255, 0, static_cast<int>(cvar.esp_alpha));
 			g_Utils.bCalcScreen(g_PlayerExtraInfoList[i].vHitboxPoints[11][0], flScreenHead);
 			g_Utils.bCalcScreen(g_PlayerExtraInfoList[i].vHitboxPoints[11][3], flScreenHead2);
-			g_Drawing.DrawLine(flScreenHead[0], flScreenHead[1], flScreenHead2[0], flScreenHead2[1], 0, 255, 0, 255);
+			g_Drawing.DrawLine(flScreenHead[0], flScreenHead[1], flScreenHead2[0], flScreenHead2[1], 0, 255, 0, static_cast<int>(cvar.esp_alpha));
 			g_Utils.bCalcScreen(g_PlayerExtraInfoList[i].vHitboxPoints[11][0], flScreenHead);
 			g_Utils.bCalcScreen(g_PlayerExtraInfoList[i].vHitboxPoints[11][4], flScreenHead2);
-			g_Drawing.DrawLine(flScreenHead[0], flScreenHead[1], flScreenHead2[0], flScreenHead2[1], 0, 255, 0, 255);
+			g_Drawing.DrawLine(flScreenHead[0], flScreenHead[1], flScreenHead2[0], flScreenHead2[1], 0, 255, 0, static_cast<int>(cvar.esp_alpha));
 
 			g_Utils.bCalcScreen(g_PlayerExtraInfoList[i].vHitboxPoints[11][6], flScreenHead);
 			g_Utils.bCalcScreen(g_PlayerExtraInfoList[i].vHitboxPoints[11][1], flScreenHead2);
-			g_Drawing.DrawLine(flScreenHead[0], flScreenHead[1], flScreenHead2[0], flScreenHead2[1], 0, 255, 0, 255);
+			g_Drawing.DrawLine(flScreenHead[0], flScreenHead[1], flScreenHead2[0], flScreenHead2[1], 0, 255, 0, static_cast<int>(cvar.esp_alpha));
 			g_Utils.bCalcScreen(g_PlayerExtraInfoList[i].vHitboxPoints[11][6], flScreenHead);
 			g_Utils.bCalcScreen(g_PlayerExtraInfoList[i].vHitboxPoints[11][2], flScreenHead2);
-			g_Drawing.DrawLine(flScreenHead[0], flScreenHead[1], flScreenHead2[0], flScreenHead2[1], 0, 255, 0, 255);
+			g_Drawing.DrawLine(flScreenHead[0], flScreenHead[1], flScreenHead2[0], flScreenHead2[1], 0, 255, 0, static_cast<int>(cvar.esp_alpha));
 			g_Utils.bCalcScreen(g_PlayerExtraInfoList[i].vHitboxPoints[11][6], flScreenHead);
 			g_Utils.bCalcScreen(g_PlayerExtraInfoList[i].vHitboxPoints[11][4], flScreenHead2);
-			g_Drawing.DrawLine(flScreenHead[0], flScreenHead[1], flScreenHead2[0], flScreenHead2[1], 0, 255, 0, 255);
+			g_Drawing.DrawLine(flScreenHead[0], flScreenHead[1], flScreenHead2[0], flScreenHead2[1], 0, 255, 0, static_cast<int>(cvar.esp_alpha));
 
 			g_Utils.bCalcScreen(g_PlayerExtraInfoList[i].vHitboxPoints[11][5], flScreenHead);
 			g_Utils.bCalcScreen(g_PlayerExtraInfoList[i].vHitboxPoints[11][1], flScreenHead2);
-			g_Drawing.DrawLine(flScreenHead[0], flScreenHead[1], flScreenHead2[0], flScreenHead2[1], 0, 255, 0, 255);
+			g_Drawing.DrawLine(flScreenHead[0], flScreenHead[1], flScreenHead2[0], flScreenHead2[1], 0, 255, 0, static_cast<int>(cvar.esp_alpha));
 			g_Utils.bCalcScreen(g_PlayerExtraInfoList[i].vHitboxPoints[11][5], flScreenHead);
 			g_Utils.bCalcScreen(g_PlayerExtraInfoList[i].vHitboxPoints[11][3], flScreenHead2);
-			g_Drawing.DrawLine(flScreenHead[0], flScreenHead[1], flScreenHead2[0], flScreenHead2[1], 0, 255, 0, 255);
+			g_Drawing.DrawLine(flScreenHead[0], flScreenHead[1], flScreenHead2[0], flScreenHead2[1], 0, 255, 0, static_cast<int>(cvar.esp_alpha));
 			g_Utils.bCalcScreen(g_PlayerExtraInfoList[i].vHitboxPoints[11][5], flScreenHead);
 			g_Utils.bCalcScreen(g_PlayerExtraInfoList[i].vHitboxPoints[11][4], flScreenHead2);
-			g_Drawing.DrawLine(flScreenHead[0], flScreenHead[1], flScreenHead2[0], flScreenHead2[1], 0, 255, 0, 255);
+			g_Drawing.DrawLine(flScreenHead[0], flScreenHead[1], flScreenHead2[0], flScreenHead2[1], 0, 255, 0, static_cast<int>(cvar.esp_alpha));
 
 			g_Utils.bCalcScreen(g_PlayerExtraInfoList[i].vHitboxPoints[11][7], flScreenHead);
 			g_Utils.bCalcScreen(g_PlayerExtraInfoList[i].vHitboxPoints[11][1], flScreenHead2);
-			g_Drawing.DrawLine(flScreenHead[0], flScreenHead[1], flScreenHead2[0], flScreenHead2[1], 0, 255, 0, 255);
+			g_Drawing.DrawLine(flScreenHead[0], flScreenHead[1], flScreenHead2[0], flScreenHead2[1], 0, 255, 0, static_cast<int>(cvar.esp_alpha));
 			g_Utils.bCalcScreen(g_PlayerExtraInfoList[i].vHitboxPoints[11][7], flScreenHead);
 			g_Utils.bCalcScreen(g_PlayerExtraInfoList[i].vHitboxPoints[11][2], flScreenHead2);
-			g_Drawing.DrawLine(flScreenHead[0], flScreenHead[1], flScreenHead2[0], flScreenHead2[1], 0, 255, 0, 255);
+			g_Drawing.DrawLine(flScreenHead[0], flScreenHead[1], flScreenHead2[0], flScreenHead2[1], 0, 255, 0, static_cast<int>(cvar.esp_alpha));
 			g_Utils.bCalcScreen(g_PlayerExtraInfoList[i].vHitboxPoints[11][7], flScreenHead);
 			g_Utils.bCalcScreen(g_PlayerExtraInfoList[i].vHitboxPoints[11][3], flScreenHead2);
-			g_Drawing.DrawLine(flScreenHead[0], flScreenHead[1], flScreenHead2[0], flScreenHead2[1], 0, 255, 0, 255);
+			g_Drawing.DrawLine(flScreenHead[0], flScreenHead[1], flScreenHead2[0], flScreenHead2[1], 0, 255, 0, static_cast<int>(cvar.esp_alpha));
 
 			for (unsigned int x = 0; x < 21; x++)
 			{
@@ -885,9 +1016,9 @@ void CVisuals::PlayerESP(unsigned int i)
 
 			float health_height = (box_height / 100) * hp;
 
-			g_Drawing.DrawRect((ScreenTop[0] + health_width), ScreenTop[1], 1, health_height, Red, Green, 0, 255);
+			g_Drawing.DrawRect((ScreenTop[0] + health_width), ScreenTop[1], 1, health_height, Red, Green, 0, static_cast<int>(cvar.esp_alpha));
 
-			g_Drawing.DrawOutlinedRect((ScreenTop[0] + health_width) - 1, ScreenTop[1], 3, box_height, 0, 0, 0, 255);
+			g_Drawing.DrawOutlinedRect((ScreenTop[0] + health_width) - 1, ScreenTop[1], 3, box_height, 0, 0, 0, static_cast<int>(cvar.esp_alpha));
 		}
 	}
 	else if (!m_bScreenTop && !m_bScreenBot)
@@ -939,17 +1070,19 @@ void CVisuals::Status() {
 		y += 15;
 	}
 
-	if (cvar.aim_perfect_silent) {
-		g_Drawing.DrawString(ESP, WIDTH, HEIGHT, 255, 255, 255, cvar.esp_alpha, FONT_LEFT, "perfect silent: %s", cvar.aim_perfect_silent ? "ON" : "OFF");
-		y += 15;
-	}
+	g_Drawing.DrawString(ESP, WIDTH, HEIGHT, 255, 255, 255, cvar.esp_alpha, FONT_LEFT, "perfect silent: %s", cvar.aim_method == 3 ? "ON" : "OFF");
+	y += 15;
 
 	// TODO: Make this more optimal some day, getting this every frame is too much...
+	Timer t;
 	net_status_t networkStatus;
-	g_Engine.pNetAPI->Status(&networkStatus);
-	float ex_interp = g_Engine.pfnGetCvarFloat("ex_interp");
-	//float fakeping = (ex_interp * 1000) + (networkStatus.latency * 1000);
-	float fakeping = networkStatus.latency * 1000;
+
+	if (t.test_and_set(400))
+	{
+		g_Engine.pNetAPI->Status(&networkStatus);
+	}
+	static const float ex_interp = g_Engine.pfnGetCvarFloat("ex_interp");
+	const float fakeping = (ex_interp * 1000) + (networkStatus.latency * 1000);
 	int fakepingColors[3] = { 255, 255, 255 };
 	if (ex_interp > 0.01) {
 		fakepingColors[1] = 255;
@@ -957,7 +1090,6 @@ void CVisuals::Status() {
 	}
 	g_Drawing.DrawString(ESP, WIDTH, HEIGHT, fakepingColors[0], fakepingColors[1], fakepingColors[2], cvar.esp_alpha, FONT_LEFT, "Fakeping: %.2fms", fakeping);
 	y += 15;
-
 
 	// Time
 	time_t rawtime;
@@ -1325,7 +1457,7 @@ void CVisuals::DrawFake(int PlayerID, int EntityID)
 
 				if (cvar.esp_box)
 				{
-					g_Drawing.DrawPlayerBox(ScreenTop[0], ScreenTop[1], box_width, box_height, r, g, b, 255);
+					g_Drawing.DrawPlayerBox(ScreenTop[0], ScreenTop[1], box_width, box_height, r, g, b, static_cast<int>(cvar.esp_alpha));
 				}
 
 				if (cvar.esp_distance)

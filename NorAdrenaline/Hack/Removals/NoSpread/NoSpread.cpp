@@ -344,7 +344,8 @@ void CNoSpread::CL_CreateMove(usercmd_s *cmd)
 	if (cvar.aim && cvar.nospread && cmd->buttons & IN_ATTACK && CanAttack())
 	{
 		g_Utils.MakeAngle(false, vAngles, cmd);
-		if (cvar.aim_perfect_silent)
+
+		if (cvar.aim_method == 3)
 			g_Utils.bSendpacket(false);
 	}
 }

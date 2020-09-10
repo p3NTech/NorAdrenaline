@@ -6,6 +6,7 @@ private:
 	void Status();
 	void PlayerESP(unsigned int i);
 	void SoundESP();
+	void SpectatorList();
 	void PredictPath();
 	void TraceAnglesESP(unsigned int i);
 	void TraceGrenade();
@@ -50,6 +51,9 @@ private:
 	CImageTexture wpn_knife;
 	CImageTexture wpn_p90;
 public:
+
+	std::vector<std::string> spectators;
+
 	void Run();
 	void IconInit();
 	void Lightmap();

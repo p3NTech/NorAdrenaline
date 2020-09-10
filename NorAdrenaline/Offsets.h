@@ -11,7 +11,7 @@ class COffsets
 private:
 	DWORD dwOldPageProtection;//For EnablePageWrite & RestorePageProtection
 public:
-	Module hardware, client, gameui, vgui2;
+	Module hardware, client, gameui, vgui2, FileSystem_Stdio, steamclient;
 
 	DWORD dwSendPacketPointer, dwSendPacketBackup, dwSpeedPointer;//Saved offsets
 
@@ -26,6 +26,9 @@ public:
 	PVOID FindStudioModelRenderer(void);
 	
 	DWORD PreS_DynamicSound(void);
+	DWORD Netchan_FragSend(void);
+	DWORD Netchan_CreateFragments(void);
+	DWORD Netchan_CreateFileFragments(void);
 	DWORD Netchan_TransmitBits(void);
 	DWORD CL_Move(void);
 	DWORD FindSpeed(void);
@@ -36,6 +39,7 @@ public:
 	void Error(PCHAR msg, bool terminate);
 
 	void PatchInterpolation(void);
+	void Call_CL_ProcessFile(void);
 
 	UserMsg FindUserMsgBase(void);
 

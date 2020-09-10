@@ -35,14 +35,18 @@ public:
 
 	bool bInitialised;
 	bool IsDragging;
+#ifndef _MENUTAB_PLIST
 	bool IsDraggingPlist;
+#endif
 
 	unsigned int iCurrentTab;
 
 	unsigned int MenuX;
 	unsigned int MenuY;
+#ifndef _MENUTAB_PLIST
 	unsigned int plistX;
 	unsigned int plistY;
+#endif
 
 	int CursorX;
 	int CursorY;
@@ -88,6 +92,7 @@ public:
 	void Checkbox(int x, int y, bool& value, char* text);
 	void Tooltip(const char* text, ...);
 	void Slider(int x, int y, float min, float max, float& value, char* text = 0, bool ThisINT = false, char* amout = 0, bool extra = false);
+	void Slider(int x, int y, float min, float max, float& value, char* text, bool ThisINT, char* amout, bool extra, const float step);
 	void SliderInPallete(int x, int y, float min, float max, float& value, char* text = 0, bool ThisINT = false, char* amout = 0, bool extra = false);
 	void ListBox(int index, int x, int y, char* name, float& value, char** text, int size, bool default = false);
 	//void InputField(int x, int y, char *text, int maxLen, int &out);
@@ -107,7 +112,9 @@ public:
 	bool IsCursorInItem(int index);
 	void calculate_vectors(bool open, std::vector<std::string> strList, int x, int y, int& _startFillX, int& _startFillY, int& _endFillX, int& _endFillY, int& _YScaling);
 	void AddItem(int index, int x, int y, std::vector<std::string> strList);
+#ifndef _MENUTAB_PLIST
 	void Playerlist();
+#endif
 	void Update();
 
 	CPlayer Players[MAX_CLIENTS + 1];
@@ -121,7 +128,9 @@ public:
 	void Drag();
 	void Init();
 public:
+#ifndef _MENUTAB_PLIST
 	bool bPlayerlistOpened;
+#endif
 	bool bOpened;
 	bool keys[256];
 

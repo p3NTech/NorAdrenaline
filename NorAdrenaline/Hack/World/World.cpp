@@ -99,17 +99,19 @@ void CWorld::UpdateLocalPlayer(float frametime, struct usercmd_s *cmd)
 
 	if (pLocal && pLocal->player)
 	{
-		g_Local.iIndex = pLocal->index;
-		g_Local.iUseHull = pmove->usehull;
-		g_Local.bAlive = g_Utils.IsLocalAlive(pLocal);
-		g_Local.flFrametime = frametime;
-		g_Local.flFPS = 1 / g_Local.flFrametime;
-		g_Local.vViewAngles = cmd->viewangles;
-		g_Local.flVelocity = pmove->velocity.Length2D();
+		g_Local.iIndex			= pLocal->index;
+		g_Local.iUseHull		= pmove->usehull;
+		g_Local.bAlive			= g_Utils.IsLocalAlive(pLocal);
+		g_Local.flFrametime		= frametime;
+		g_Local.flFPS			= 1 / g_Local.flFrametime;
+		g_Local.vViewAngles		= cmd->viewangles;
+		g_Local.vVelocity		= pmove->velocity;
+		g_Local.flVelocity		= pmove->velocity.Length2D();
 		g_Local.flVelocityspeed = sqrt(POW(pmove->velocity[0]) + POW(pmove->velocity[1]));
-		g_Local.flFallVelocity = pmove->flFallVelocity;
-		g_Local.vOrigin = pmove->origin;
-		g_Local.vEye = pmove->origin + pmove->view_ofs;
+		g_Local.flFallVelocity	= pmove->flFallVelocity;
+		g_Local.vOrigin			= pmove->origin;
+		g_Local.vFootOrigin		= Vector(pmove->origin[0], pmove->origin[1], pmove->origin[2] - ((pmove->player_maxs->z - pmove->player_mins->z) < 54 ? 18.0f : 36.0f));
+		g_Local.vEye			= pmove->origin + pmove->view_ofs;
 
 		//Get Distance to Ground
 		{
@@ -342,11 +344,12 @@ void CWorld::UpdatePlayers()
 		if (g_Player[i].flFrametime == NULL)
 			g_Player[i].flFrametime = g_Local.flFrametime;
 
-		g_Player[i].bDucked = ((ent->curstate.maxs[2] - ent->curstate.mins[2]) < 54 ? true : false);
-		g_Player[i].vPrevOrigin = g_Player[i].vOrigin;
-		g_Player[i].vOrigin = ent->curstate.origin;
-		g_Player[i].vVelocity = ent->curstate.origin - ent->prevstate.origin;
-		g_Player[i].flDist = g_Player[i].vOrigin.Distance(g_Local.vOrigin);
+		g_Player[i].bDucked			= ((ent->curstate.maxs[2] - ent->curstate.mins[2]) < 54 ? true : false);
+		g_Player[i].vPrevOrigin		= g_Player[i].vOrigin;
+		g_Player[i].vOrigin			= ent->curstate.origin;
+		g_Player[i].vFootOrigin		= Vector(ent->curstate.origin[0], ent->curstate.origin[1], ent->curstate.origin[2] - ((ent->curstate.maxs[2] - ent->curstate.mins[2]) < 54 ? 14.0f : 34.0f));
+		g_Player[i].vVelocity		= ent->curstate.origin - ent->prevstate.origin;
+		g_Player[i].flDist			= g_Player[i].vOrigin.Distance(g_Local.vOrigin);
 
 		int seq = Cstrike_SequenceInfo[ent->curstate.sequence];
 

@@ -4,7 +4,7 @@ class CSystems
 public:
 	void PhysicsClipVelocity(Vector &in, const Vector &normal, Vector &out, float overbounce);
 	bool PhysicsApplyFriction(Vector &in, Vector &out, float flSurfaceFriction, float flTickRate);
-	void DrawDebugArrow(const float x0, const float y0, const float x1, const float y1, const DWORD color, const int alpha);
+	void DrawDebugArrow(const float x0, const float y0, const float x1, const float y1, const DWORD color, const int size);
 	float GetEntityGravity();
 
 	bool canReachVector(Vector loc, Vector dest);
@@ -37,7 +37,8 @@ public:
 	void JumpBug(float frametime, struct usercmd_s *cmd);
 	void AirDuck(struct usercmd_s *cmd);
 	void WalkTo(const Vector &vector, struct usercmd_s *cmd);
-	void MoveTo(const Vector &vector, CBaseLocal *ent, struct usercmd_s *cmd);
+	void MoveTo(struct cl_entity_s* ent, usercmd_s* cmd);
+	void AutoGoto(usercmd_s* cmd);
 private:
 	int DetectStrafeDir(struct usercmd_s *cmd);
 };

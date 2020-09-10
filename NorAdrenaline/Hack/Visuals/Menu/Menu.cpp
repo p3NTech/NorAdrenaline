@@ -1,5 +1,6 @@
 ﻿#include "../../../Required.h"
 #include "../../../images.h"
+#include <cinttypes>
 
 CMenu g_Menu;
 CPlayer g_PPlayer;
@@ -141,7 +142,9 @@ void CMenu::Init()
 
 		bInitialised = true;
 		bOpened = false;
+#ifndef _MENUTAB_PLIST
 		bPlayerlistOpened = false;
+#endif
 		dwCheckboxBlockedTime = 0;
 		dwInputfieldBlockedTime = 0;
 		dwSliderBlockedTime = 0;
@@ -152,8 +155,10 @@ void CMenu::Init()
 		// default menu position
 		MenuX	= 100;
 		MenuY	= 200;
+#ifndef _MENUTAB_PLIST
 		plistX	= 100 + 650;
 		plistY	= 200;
+#endif
 
 		iCurrentTab = 5; // default tab
 	}
@@ -228,7 +233,9 @@ void CMenu::Run()
 
 	SelectTab();
 	DrawMenuTabs();
+#ifndef _MENUTAB_PLIST
 	Playerlist();
+#endif
 	Tabs();
 	Drag();
 }
@@ -241,6 +248,7 @@ bool CMenu::IsMouseInRegion(int x, int y, int x2, int y2)
 		return false;
 }
 
+#ifndef _MENUTAB_PLIST
 void CMenu::Playerlist()
 {
 	static DWORD dwTemporaryBlockTimer = 0;
@@ -271,6 +279,7 @@ void CMenu::Playerlist()
 
 	Update();
 }
+#endif
 
 void CMenu::Update()
 {
@@ -309,8 +318,13 @@ void CMenu::Update()
 
 void CMenu::Paint()
 {
+#ifndef _MENUTAB_PLIST
 	int x = plistX + 30;
 	int y = plistY + 35;
+#else
+	int x = MenuX + 100;
+	int y = MenuY + 35;
+#endif
 	int box_indent_x = 15;
 	int box_indent_y = 15;
 
@@ -416,8 +430,12 @@ void CMenu::calculate_vectors(bool open, std::vector<std::string> strList, int x
 {
 	// constants
 	static const int scaling = 1;
-	static const int width = 560;
 	static const int height = 11;
+#ifdef _MENUTAB_PLIST
+	static const int width = 490;
+#else
+	static const int width = 560;
+#endif
 
 	// position calc
 	int startFillY = (y - height / 2) + scaling;
@@ -468,14 +486,17 @@ void CMenu::AddItem(int index, int x, int y, std::vector<std::string> strList)
 	g_pISurface->DrawSetColor(30, 30, 30, 255);
 	g_pISurface->DrawFilledRect(startFillX, startFillY, endFillX, endFillY);
 
-	auto col = [&open]() -> DWORD {
-		if (open)
+	auto col = [&open, &index]() -> DWORD {
+		if (open && (!g_Player[index].bFriend && !g_Player[index].bPriority))
 		{
 			return COLORCODE(static_cast<int>(cvar.cheat_global_color_r), static_cast<int>(cvar.cheat_global_color_g), static_cast<int>(cvar.cheat_global_color_b), 255);
 		}
+		else if (g_Player[index].bFriend)
+			return COLORCODE(static_cast<int>(cvar.friend_color_r), static_cast<int>(cvar.friend_color_g), static_cast<int>(cvar.friend_color_b), 255);
+		else if (g_Player[index].bPriority)
+			return COLORCODE(static_cast<int>(cvar.priority_color_r), static_cast<int>(cvar.priority_color_g), static_cast<int>(cvar.priority_color_b), 255);
 		else
-			return COLORCODE(20, 20, 20, 255);
-
+			return (16, 16, 16, 255);
 	};
 
 	DWORD selection_color = col();
@@ -491,18 +512,38 @@ void CMenu::AddItem(int index, int x, int y, std::vector<std::string> strList)
 	if (open)
 	{
 		int newline = _y + 11;
-		// skip first element, draw other shit
+
 		for (auto p : skip<decltype(strList)>(strList, 1))
 		{
 			g_Drawing.DrawString(MENU, x + 5, newline + 1, 220, 220, 220, 255, FONT_LEFT, p.c_str());
 			newline += 11;
 		}
 
-		Checkbox(x + 220, _y, g_Player[index].bTraitor, "Traitor");
+		CSteamID player_SID = CSteamID(g_PlayerInfoList[index].m_nSteamID);
+
+		char formated_string[256];
+		std::snprintf(formated_string, sizeof(formated_string), "http://steamcommunity.com/profiles/%I64u", player_SID.ConvertToUint64());
+
+		if (cvar.TTT)
+			Checkbox(x + 220, _y, g_Player[index].bTraitor, "Is Traitor?");
+
 		Checkbox(x + 220, _y + 15, g_Player[index].bFriend, "Friend");
 		Checkbox(x + 220, _y + 30, g_Player[index].bPriority, "Priority");
 
-		CSteamID player_SID = CSteamID(g_PlayerInfoList[index].m_nSteamID);
+		if (player_SID.IsValid())
+		{
+			if (DrawButton(x + 220, _y + 85, "Copy SteamID",
+				"Copy SteamID2 to clipboard."))
+			{
+				func.toClipboard(format("STEAM_0:%llu:%llu", (g_PlayerInfoList[index].m_nSteamID & 0xFFFFFFFF) & 1, (g_PlayerInfoList[index].m_nSteamID & 0xFFFFFFFF) >> 1).c_str());
+			}
+
+			if (DrawButton(x + 220, _y + 106, "Open profile in web-browser"))
+			{
+				keys[VK_LBUTTON] = false; // closes game window so mouse button is hold until you click again
+				system(format("start chrome %s", formated_string).c_str());
+			}
+		}
 
 		static int old_avatar = NULL;
 
@@ -532,14 +573,14 @@ void CMenu::AddItem(int index, int x, int y, std::vector<std::string> strList)
 			{
 				static const int scaling = 1;
 				static const int textscaling = 13;
-				int avatarX = x + 280;
+				int avatarX = x + 300;
 				int avatarY = _y;
 
-				g_pISurface->DrawSetColor(cvar.cheat_global_color_r, cvar.cheat_global_color_g, cvar.cheat_global_color_b, 255);
+				g_pISurface->DrawSetColor(static_cast<int>(cvar.cheat_global_color_r), static_cast<int>(cvar.cheat_global_color_g), static_cast<int>(cvar.cheat_global_color_b), 255);
 				g_pISurface->DrawOutlinedRect(avatarX - scaling, avatarY - scaling, avatarX + scaling + player_avatar.width, avatarY + scaling + textscaling + player_avatar.height);
 
 				g_Drawing.DrawString(MENU, (avatarX + (avatarX + player_avatar.width)) / 2, (avatarY + (avatarY + textscaling)) / 2, 255, 255, 255, 255, FONT_CENTER, "Player's avatar");
-				g_Drawing.DrawLine(avatarX, avatarY + textscaling - scaling, avatarX + player_avatar.width, avatarY + textscaling - scaling, cvar.cheat_global_color_r, cvar.cheat_global_color_g, cvar.cheat_global_color_b, 255);
+				g_Drawing.DrawLine(avatarX, avatarY + textscaling - scaling, avatarX + player_avatar.width, avatarY + textscaling - scaling, static_cast<int>(cvar.cheat_global_color_r), static_cast<int>(cvar.cheat_global_color_g), static_cast<int>(cvar.cheat_global_color_b), 255);
 				g_Drawing.DrawTexture(player_avatar.index, avatarX, avatarY + textscaling, avatarX + player_avatar.width, avatarY + textscaling + player_avatar.height);
 			}
 		}
@@ -593,21 +634,20 @@ void CMenu::Tabs()
 			save[9] = y + line_y;
 			line_y += 40;
 
+			static char* szAimMethod[] = { "Non-Silent", "Silent", "Perfect Silent" };
+			save[11] = y + line_y;
+			line_y += 30;
+
 			Checkbox(x + indent_x, y + line_y, cvar.aim_teammates, "Teammates");
 			line_y += 15;
 
 			Checkbox(x + indent_x, y + line_y, cvar.aim_penetration, "Automatic penetration");
 			line_y += 15;
 
-			Checkbox(x + indent_x, y + line_y, cvar.aim_silent, "Silent aim");
-			line_y += 15;
-
-			Checkbox(x + indent_x, y + line_y, cvar.aim_perfect_silent, "Perfect silent aim");
-			line_y += 30;
-
 			ListBox(iListIndex++, x + indent_x, save[9], "Multi-point", cvar.aim_multi_point, szMultipoint, 3, true);
 			ListBox(iListIndex++, x + indent_x, save[8], "Target hitbox", cvar.aim_hitbox, szTargetHitbox, 6, false);
 			ListBox(iListIndex++, x + indent_x, save[7], "Target selection", cvar.aim_target_selection, szTargetSelection, 3, false);
+			ListBox(iListIndex++, x + indent_x, save[11], "Aim method", cvar.aim_method, szAimMethod, 3, false);
 		}
 
 		{//BOX1.2
@@ -660,8 +700,11 @@ void CMenu::Tabs()
 			Checkbox(x + indent_x, y + line_y, cvar.aim_autoscope, "Automatic scope");
 			line_y += 15;
 
-			Checkbox(x + indent_x, y + line_y, cvar.aim_delay_shot, "Anti-aim resolver");
-			line_y += 15;
+			if (cvar.aim_method != 3)
+			{
+				Checkbox(x + indent_x, y + line_y, cvar.aim_bullet_time, "Bullet time");
+				line_y += 15;
+			}
 
 			Checkbox(x + indent_x, y + line_y, cvar.aim_delay_shot, "Delay shot");
 			line_y += 30;
@@ -965,19 +1008,19 @@ void CMenu::Tabs()
 		{//BOX1
 			GroupBox(x, y, 250, 430, FONT_CENTER, "Movement");
 
-			Checkbox(x + box_indent_x, y + line_y, cvar.bunnyhop, "Auto jump");
+			Checkbox(x + box_indent_x, y + line_y, cvar.bunnyhop, "Auto-jump");
 			line_y += 15;
 
-			Checkbox(x + box_indent_x, y + line_y, cvar.air_duck, "Jump duck");
+			Checkbox(x + box_indent_x, y + line_y, cvar.air_duck, "Jump-duck");
 			line_y += 15;
 
-			Checkbox(x + box_indent_x, y + line_y, cvar.jump_bug, "Jump bug");
+			Checkbox(x + box_indent_x, y + line_y, cvar.jump_bug, "Jump-bug");
 			line_y += 15;
 
-			Checkbox(x + box_indent_x, y + line_y, cvar.fastrun_temp, "Fast run");
+			Checkbox(x + box_indent_x, y + line_y, cvar.fastrun_temp, "Fast-run");
 			line_y += 15;
 
-			Checkbox(x + box_indent_x, y + line_y, cvar.autostrafe, "Automatic strafing");
+			Checkbox(x + box_indent_x, y + line_y, cvar.autostrafe, "Auto-strafe");
 			line_y += 30;
 
 			Slider(x + box_indent_x, y + line_y, 0, 1000, cvar.strafe_speed, "Strafing speed");
@@ -987,16 +1030,40 @@ void CMenu::Tabs()
 		{//BOX2
 			x = x + 270;
 			line_y = 15;
-			GroupBox(x, y, 250, 200, FONT_CENTER, "Other");
+			GroupBox(x, y, 250, 100, FONT_CENTER, "Knife-bot");
 
-			Checkbox(x + box_indent_x, y + line_y, cvar.knifebot, "Knifebot");
-			line_y += 20;
+			Checkbox(x + box_indent_x, y + line_y, cvar.knifebot, "Enabled");
+			line_y += 15;
+
+			Checkbox(x + box_indent_x, y + line_y, cvar.knifebot_silent, "Silent");
+			line_y += 15;
+
+			Checkbox(x + box_indent_x, y + line_y, cvar.knifebot_attack1, "Primary attack");
+			line_y += 30;
+
+			static char* szTargetHitbox[] = { "Origin", "Head" };
+			save[235] = y + line_y;
+			line_y += 40;
+
+			ListBox(iListIndex++, x + indent_x, save[235], "Target hitbox", cvar.knifebot_aim_hitbox, szTargetHitbox, 2, false);
 		}
 
 		{//BOX3
-			y = y + 220;
+			y = y + 120;
 			line_y = 15;
-			GroupBox(x, y, 250, 210, FONT_CENTER, "Followbot");
+			GroupBox(x, y, 250, 50, FONT_CENTER, "Other");
+
+			Checkbox(x + box_indent_x, y + line_y, cvar.autogoto, "Auto-goto");
+			line_y += 15;
+
+			Checkbox(x + box_indent_x, y + line_y, cvar.autogoto_adjust_speed, "Auto-goto adjust speed");
+			line_y += 15;
+		}
+
+		{//BOX4
+			y = y + 70;
+			line_y = 15;
+			GroupBox(x, y, 250, 200, FONT_CENTER, "Follow-bot");
 
 			Checkbox(x + box_indent_x, y + line_y, cvar.Followbot, "enabled");
 			line_y += 15;
@@ -1016,7 +1083,7 @@ void CMenu::Tabs()
 			Slider(x + box_indent_x, y + line_y, 80, 1000, cvar.Followbot_activation, "activation distance");
 			line_y += 30;
 
-			Slider(x + box_indent_x, y + line_y, 200, 15000, cvar.Followbot_afk_time, "AFK time (ms)");
+			Slider(x + box_indent_x, y + line_y, 200, 15000, cvar.Followbot_afk_time, "AFK time", true, "ms");
 			line_y += 30;
 
 			Slider(x + box_indent_x, y + line_y, 0, 400, cvar.Followbot_distance, "distance");
@@ -1261,17 +1328,14 @@ void CMenu::Tabs()
 			InputField(x + box_indent_x, y + line_y, "Name", 32, new_name, []() { if (!new_name.empty()) { g_Engine.PlayerInfo_SetValueForKey("name", new_name.c_str()); } });
 			line_y += 40;
 
-			Checkbox(x + box_indent_x, y + line_y, cvar.spam, "Chat spam");
-			line_y += 30;
+			//Slider(x + box_indent_x, y + line_y, 0, 5000, cvar.spam_timer, "Spam timer", true, "ms");
+			//line_y += 35;
 
-			Slider(x + box_indent_x, y + line_y, 0, 5000, cvar.spam_timer, "Spam timer", true, " ms");
-			line_y += 35;
-
-			Slider(x + box_indent_x, y + line_y, 0, 10000, cvar.name_stealer, "Name stealer", true, " ms");
+			Slider(x + box_indent_x, y + line_y, 0, 10000, cvar.name_stealer, "Name stealer", true, "ms");
 			line_y += 35;
 
 			Slider(x + box_indent_x, y + line_y, 0, 6000, cvar.adjust_speed_amount, "Adjust speed amount", true);
-			line_y += 35;
+			line_y += 20;
 
 			Checkbox(x + box_indent_x, y + line_y, cvar.fakelatency, "Fake latency");
 			line_y += 30;
@@ -1280,6 +1344,9 @@ void CMenu::Tabs()
 			line_y += 35;
 
 			Slider(x + box_indent_x, y + line_y, 0, 1, cvar.esp_sound_minimum_volume, "Minimum volume sound");
+			line_y += 35;
+
+			Slider(x + box_indent_x, y + line_y, 1, 255, cvar.esp_alpha, "ESP alpha", true);
 			line_y += 35;
 		}
 
@@ -1388,7 +1455,7 @@ void CMenu::Tabs()
 			line_y += 18;
 
 			if (DrawButton(x + box_indent_x, y + line_y, "Crash server",
-				"#Label name crash exploit. (a lot servers have fixed this)"
+				"meme"
 			))
 			{
 				g_Misc.CrashServer();
@@ -1444,92 +1511,26 @@ void CMenu::Tabs()
 				"Sets name to invisible character."
 			))
 			{
-				g_Engine.PlayerInfo_SetValueForKey("name", func.strToChar("100000000011111000000000111110000000001110"));
+				g_Engine.PlayerInfo_SetValueForKey("name", func.ConvertToUTF8(L" "));
 			}
 			line_y += 25;
 		}
 	}
+#ifdef _MENUTAB_PLIST
 	else if (iCurrentTab == 6)
 	{
 		int x = MenuX + 100;
 		int y = MenuY + 30;
-		int box_indent_x = 10;
+		int box_indent_x = 15;
 		int box_indent_y = 15;
-
-		int save[256];
-
-		int line_y = 15;
 
 		{//BOX1
 			GroupBox(x, y, 520, 430, FONT_CENTER, "Player list");
 
-			size_t max = g_Engine.GetMaxClients();
-
-			if (max > 16)
-				max = 16;
-
-			for (int j = 1; j <= max; j++)
-			{
-				if (j == g_Local.iIndex)
-					continue;
-
-				if (g_PlayerInfoList[j].name)
-				{
-					if (g_Player[j].iTeam == CT)
-						g_Drawing.DrawString(MENU, x + box_indent_x, y + line_y + 4, 0, 0, 180, 255, FONT_LEFT, "%i.) %s", j, g_PlayerInfoList[j].name);
-					else if (g_Player[j].iTeam == TERRORIST)
-						g_Drawing.DrawString(MENU, x + box_indent_x, y + line_y + 4, 180, 0, 0, 255, FONT_LEFT, "%i.) %s", j, g_PlayerInfoList[j].name);
-					else
-						g_Drawing.DrawString(MENU, x + box_indent_x, y + line_y + 4, 180, 180, 180, 255, FONT_LEFT, "%i.) %s", j, g_PlayerInfoList[j].name);
-				}
-				else
-					g_Drawing.DrawString(MENU, x + box_indent_x, y + line_y + 4, 180, 180, 180, 255, FONT_LEFT, "%i.) ", j);
-
-				if (g_PlayerInfoList[j].ping > 0)
-				{
-					Checkbox(x + box_indent_x + 160, y + line_y, g_Player[j].bFriend, "F");
-
-					Checkbox(x + box_indent_x + 180, y + line_y, g_Player[j].bPriority, "P");
-
-					Checkbox(x + box_indent_x + 200, y + line_y, g_Player[j].bTraitor, "T");
-				}
-
-				line_y += 20;
-			}
-
-			x = x + 270;
-			line_y = 15;
-
-			for (int j = max + 1; j <= g_Engine.GetMaxClients(); j++)
-			{
-				if (j == g_Local.iIndex)
-					continue;
-
-				if (g_PlayerInfoList[j].name)
-				{
-					if (g_Player[j].iTeam == CT)
-						g_Drawing.DrawString(MENU, x + box_indent_x, y + line_y + 4, 0, 0, 180, 255, FONT_LEFT, "%i.) %s", j, g_PlayerInfoList[j].name);
-					else if (g_Player[j].iTeam == TERRORIST)
-						g_Drawing.DrawString(MENU, x + box_indent_x, y + line_y + 4, 180, 0, 0, 255, FONT_LEFT, "%i.) %s", j, g_PlayerInfoList[j].name);
-					else
-						g_Drawing.DrawString(MENU, x + box_indent_x, y + line_y + 4, 180, 180, 180, 255, FONT_LEFT, "%i.) %s", j, g_PlayerInfoList[j].name);
-				}
-				else
-					g_Drawing.DrawString(MENU, x + box_indent_x, y + line_y + 4, 180, 180, 180, 255, FONT_LEFT, "%i.) ", j);
-
-				if (g_PlayerInfoList[j].ping > 0)
-				{
-					Checkbox(x + box_indent_x + 160, y + line_y, g_Player[j].bFriend, "F");
-
-					Checkbox(x + box_indent_x + 180, y + line_y, g_Player[j].bPriority, "P");
-					
-					Checkbox(x + box_indent_x + 200, y + line_y, g_Player[j].bTraitor, "T");
-				}
-
-				line_y += 20;
-			}
+			Update();
 		}
 	}
+#endif
 }
 
 void CMenu::InputField(int x, int y, char* text, int maxLen, int& out, std::function<void()>&& Callback)
@@ -1537,7 +1538,7 @@ void CMenu::InputField(int x, int y, char* text, int maxLen, int& out, std::func
 	unsigned int w = 220;
 	unsigned int h = 16;
 
-	g_pISurface->DrawSetColor(cvar.cheat_global_color_r, cvar.cheat_global_color_g, cvar.cheat_global_color_b, 255);
+	g_pISurface->DrawSetColor(static_cast<int>(cvar.cheat_global_color_r), static_cast<int>(cvar.cheat_global_color_g), static_cast<int>(cvar.cheat_global_color_b), 255);
 	g_pISurface->DrawOutlinedRect(x - 2, y - 2, x + w + 2, y + h + 2);
 
 	static bool callback	= false;
@@ -1634,7 +1635,7 @@ void CMenu::InputField(int x, int y, char* text, int maxStrLen, std::string& out
 	unsigned int w = 220;
 	unsigned int h = 16;
 
-	g_pISurface->DrawSetColor(cvar.cheat_global_color_r, cvar.cheat_global_color_g, cvar.cheat_global_color_b, 255);
+	g_pISurface->DrawSetColor(static_cast<int>(cvar.cheat_global_color_r), static_cast<int>(cvar.cheat_global_color_g), static_cast<int>(cvar.cheat_global_color_b), 255);
 	g_pISurface->DrawOutlinedRect(x - 2, y - 2, x + w + 2, y + h + 2);
 
 	static bool callback	= false;
@@ -1730,7 +1731,7 @@ bool CMenu::DrawButton(int x, int y, char *text)
 	unsigned int w = 220;
 	unsigned int h = 16;
 
-	g_pISurface->DrawSetColor(cvar.cheat_global_color_r, cvar.cheat_global_color_g, cvar.cheat_global_color_b, 255);
+	g_pISurface->DrawSetColor(static_cast<int>(cvar.cheat_global_color_r), static_cast<int>(cvar.cheat_global_color_g), static_cast<int>(cvar.cheat_global_color_b), 255);
 	g_pISurface->DrawOutlinedRect(x - 2, y - 2, x + w + 2, y + h + 2);
 
 	bool clicked = false;
@@ -1753,9 +1754,9 @@ bool CMenu::DrawButton(int x, int y, char *text)
 
 		if (bCursorInParams)
 		{
-			r = cvar.cheat_global_color_r;
-			g = cvar.cheat_global_color_g;
-			b = cvar.cheat_global_color_b;
+			r = 101;
+			g = 0;
+			b = 0;
 		}
 		else
 			r = g = b = 10;
@@ -1774,7 +1775,7 @@ bool CMenu::DrawButton(int x, int y, char *text)
 
 	if (clicked || bCursorInParams)
 	{
-		g_pISurface->DrawSetColor(cvar.cheat_global_color_r, cvar.cheat_global_color_g, cvar.cheat_global_color_b, 255);
+		g_pISurface->DrawSetColor(101, 0, 0, 255);
 		g_pISurface->DrawFilledRect(x, y, x + w, y + h);
 	}
 	else
@@ -1794,7 +1795,7 @@ bool CMenu::DrawButton(int x, int y, char* text, const char* tooltip, ...)
 	unsigned int w = 220;
 	unsigned int h = 16;
 
-	g_pISurface->DrawSetColor(cvar.cheat_global_color_r, cvar.cheat_global_color_g, cvar.cheat_global_color_b, 255);
+	g_pISurface->DrawSetColor(static_cast<int>(cvar.cheat_global_color_r), static_cast<int>(cvar.cheat_global_color_g), static_cast<int>(cvar.cheat_global_color_b), 255);
 	g_pISurface->DrawOutlinedRect(x - 2, y - 2, x + w + 2, y + h + 2);
 
 	bool clicked = false;
@@ -1817,9 +1818,9 @@ bool CMenu::DrawButton(int x, int y, char* text, const char* tooltip, ...)
 
 		if (bCursorInParams)
 		{
-			r = cvar.cheat_global_color_r;
-			g = cvar.cheat_global_color_g;
-			b = cvar.cheat_global_color_b;
+			r = static_cast<int>(cvar.cheat_global_color_r);
+			g = static_cast<int>(cvar.cheat_global_color_g);
+			b = static_cast<int>(cvar.cheat_global_color_b);
 		}
 		else
 			r = g = b = 10;
@@ -1838,7 +1839,7 @@ bool CMenu::DrawButton(int x, int y, char* text, const char* tooltip, ...)
 
 	if (clicked || bCursorInParams)
 	{
-		g_pISurface->DrawSetColor(cvar.cheat_global_color_r, cvar.cheat_global_color_g, cvar.cheat_global_color_b, 255);
+		g_pISurface->DrawSetColor(static_cast<int>(cvar.cheat_global_color_r), static_cast<int>(cvar.cheat_global_color_g), static_cast<int>(cvar.cheat_global_color_b), 255);
 		g_pISurface->DrawFilledRect(x, y, x + w, y + h);
 	}
 	else
@@ -2115,7 +2116,7 @@ void CMenu::SliderInPallete(int x, int y, float min, float max, float &value, ch
 	g_pISurface->DrawSetColor(81, 81, 81, 255);
 	g_pISurface->DrawFilledRect(x, y, x + fill - highlightSizeX, y + h);
 
-	g_pISurface->DrawSetColor(cvar.cheat_global_color_r, cvar.cheat_global_color_g, cvar.cheat_global_color_b, 255);
+	g_pISurface->DrawSetColor(static_cast<int>(cvar.cheat_global_color_r), static_cast<int>(cvar.cheat_global_color_g), static_cast<int>(cvar.cheat_global_color_b), 255);
 	g_pISurface->DrawFilledRect(highlightStartX, y, highlightEndX, y + h);
 
 	if (!amout)
@@ -2124,16 +2125,16 @@ void CMenu::SliderInPallete(int x, int y, float min, float max, float &value, ch
 	if (!ThisINT)
 	{
 		if (!extra)
-			g_Drawing.DrawString(MENU, x + (w / 2), y + (h / 2), 255, 255, 255, 255, FONT_CENTER, "%.2f%s", value, amout);
+			g_Drawing.DrawString(MENU, x + (w / 2), y + (h / 2), 255, 255, 255, 255, FONT_CENTER, "%.2f %s", value, amout);
 		else
-			g_Drawing.DrawStringACP(MENU, x + (w / 2), y + (h / 2), 255, 255, 255, 255, FONT_CENTER, "%.2f%s", value, amout);
+			g_Drawing.DrawStringACP(MENU, x + (w / 2), y + (h / 2), 255, 255, 255, 255, FONT_CENTER, "%.2f %s", value, amout);
 	}
 	else
 	{
 		if (!extra)
-			g_Drawing.DrawString(MENU, x + (w / 2), y + (h / 2), 255, 255, 255, 255, FONT_CENTER, "%.f%s", value, amout);
+			g_Drawing.DrawString(MENU, x + (w / 2), y + (h / 2), 255, 255, 255, 255, FONT_CENTER, "%.f %s", value, amout);
 		else
-			g_Drawing.DrawString(MENU, x + (w / 2), y + (h / 2), 255, 255, 255, 255, FONT_CENTER, "%.f%s", value, amout);
+			g_Drawing.DrawString(MENU, x + (w / 2), y + (h / 2), 255, 255, 255, 255, FONT_CENTER, "%.f %s", value, amout);
 	}
 
 	if (GetTickCount64() - dwListBlockedTime > 200 && !bCursorInPalette && !bCursorInList && !IsDragging && CursorX >= x && CursorX <= x + w && CursorY >= y && CursorY <= y + h)
@@ -2255,7 +2256,7 @@ void CMenu::Slider(int x, int y, float min, float max, float &value, char *text,
 	g_pISurface->DrawSetColor(81, 81, 81, 255);
 	g_pISurface->DrawFilledRect(x, y, x + fill - highlightSizeX, y + h);
 
-	g_pISurface->DrawSetColor(cvar.cheat_global_color_r, cvar.cheat_global_color_g, cvar.cheat_global_color_b, 125);
+	g_pISurface->DrawSetColor(static_cast<int>(cvar.cheat_global_color_r), static_cast<int>(cvar.cheat_global_color_g), static_cast<int>(cvar.cheat_global_color_b), 255);
 	g_pISurface->DrawFilledRect(highlightStartX, y, highlightEndX, y + h);
 
 	if (!amout)
@@ -2264,16 +2265,126 @@ void CMenu::Slider(int x, int y, float min, float max, float &value, char *text,
 	if (!ThisINT)
 	{
 		if (!extra)
-			g_Drawing.DrawString(MENU, x + (w / 2), y + (h / 2), 255, 255, 255, 255, FONT_CENTER, "%.2f%s", value, amout);
+			g_Drawing.DrawString(MENU, x + (w / 2), y + (h / 2), 255, 255, 255, 255, FONT_CENTER, "%.2f %s", value, amout);
 		else
-			g_Drawing.DrawStringACP(MENU, x + (w / 2), y + (h / 2), 255, 255, 255, 255, FONT_CENTER, "%.2f%s", value, amout);
+			g_Drawing.DrawStringACP(MENU, x + (w / 2), y + (h / 2), 255, 255, 255, 255, FONT_CENTER, "%.2f %s", value, amout);
 	}
 	else
 	{
 		if (!extra)
-			g_Drawing.DrawString(MENU, x + (w / 2), y + (h / 2), 255, 255, 255, 255, FONT_CENTER, "%.f%s", value, amout);
+			g_Drawing.DrawString(MENU, x + (w / 2), y + (h / 2), 255, 255, 255, 255, FONT_CENTER, "%.f %s", value, amout);
 		else
-			g_Drawing.DrawString(MENU, x + (w / 2), y + (h / 2), 255, 255, 255, 255, FONT_CENTER, "%.f%s", value, amout);
+			g_Drawing.DrawString(MENU, x + (w / 2), y + (h / 2), 255, 255, 255, 255, FONT_CENTER, "%.f %s", value, amout);
+	}
+
+	if (GetTickCount64() - dwSliderBlockedTime > 200 && GetTickCount64() - dwListBlockedTime > 200 && !bCursorInPalette && !bCursorInList && !IsDragging && CursorX >= x && CursorX <= x + w && CursorY >= y && CursorY <= y + h)
+	{
+		static int upTrueCount = 0;
+		static int downTrueCount = 0;
+		static const int step = 1;
+
+		time_t start = time(0);
+
+		if (start < 1)
+		{
+			if (cvar.m_Wheel_up)
+				upTrueCount += 1;
+
+			if (cvar.m_Wheel_down)
+				downTrueCount += 1;
+		}
+
+		if (cvar.m_Wheel_up)
+			value += step + upTrueCount;
+
+		if (cvar.m_Wheel_down)
+			value -= step + downTrueCount;
+
+		cvar.m_Wheel_up = false;
+		cvar.m_Wheel_down = false;
+
+		upTrueCount = 0;
+		downTrueCount = 0;
+
+		if (keys[VK_LBUTTON]) {
+			value = (CursorX - x) / one;
+
+			if (value < min)
+				value = min;
+			else if (value > max)
+				value = max;
+		}
+		else if (keys[VK_RBUTTON] && min < 0) {
+			value = (CursorX - x) / one;
+			value *= -1;
+
+			if (value < min)
+				value = min;
+			else if (value > max)
+				value = max;
+		}
+	}
+}
+
+void CMenu::Slider(int x, int y, float min, float max, float& value, char* text, bool ThisINT, char* amout, bool extra, const float step)
+{
+	unsigned int w = 230;
+	unsigned int h = 12;
+
+	g_pISurface->DrawSetColor(5, 5, 5, 255);
+	g_pISurface->DrawFilledRect(x, y, x + w, y + h);
+
+	g_pISurface->DrawSetColor(0, 0, 0, 255);
+	g_pISurface->DrawOutlinedRect(x - 1, y - 1, x + w + 1, y + h + 1);
+
+	//shadow
+	g_pISurface->DrawSetColor(10, 10, 10, 255);
+	g_pISurface->DrawOutlinedRect(x - 2, y - 2, x + w + 2, y + h + 2);
+
+	if (text)
+		g_Drawing.DrawString(MENU, x + 1, y - 10, 220, 220, 220, 255, FONT_LEFT, text);
+
+	if (ThisINT)
+		value = (int)value;
+
+	if (value < min)
+		value = min;
+	else if (value > max)
+		value = max;
+
+	float one = (w / max);
+
+	int fill = one * value;
+
+	if (value < 0)
+		fill *= -1;
+
+	static const int highlightSizeX = 3;
+	int highlightStartX = x + (fill - highlightSizeX);
+	int highlightEndX = highlightStartX + highlightSizeX;
+
+	g_pISurface->DrawSetColor(81, 81, 81, 255);
+	g_pISurface->DrawFilledRect(x, y, x + fill - highlightSizeX, y + h);
+
+	g_pISurface->DrawSetColor(static_cast<int>(cvar.cheat_global_color_r), static_cast<int>(cvar.cheat_global_color_g), static_cast<int>(cvar.cheat_global_color_b), 255);
+	g_pISurface->DrawFilledRect(highlightStartX, y, highlightEndX, y + h);
+
+	if (!amout)
+		amout = "";
+
+	if (!ThisINT)
+	{
+		if (!extra)
+			g_Drawing.DrawString(MENU, x + (w / 2), y + (h / 2), 255, 255, 255, 255, FONT_CENTER, "%.2f %s", value, amout);
+		else
+			g_Drawing.DrawStringACP(MENU, x + (w / 2), y + (h / 2), 255, 255, 255, 255, FONT_CENTER, "%.2f %s", value, amout);
+	}
+	else
+	{
+		if (!extra)
+			g_Drawing.DrawString(MENU, x + (w / 2), y + (h / 2), 255, 255, 255, 255, FONT_CENTER, "%.f %s", value, amout);
+		else
+			g_Drawing.DrawString(MENU, x + (w / 2), y + (h / 2), 255, 255, 255, 255, FONT_CENTER, "%.f %s", value, amout);
 	}
 
 	if (GetTickCount64() - dwSliderBlockedTime > 200 && GetTickCount64() - dwListBlockedTime > 200 && !bCursorInPalette && !bCursorInList && !IsDragging && CursorX >= x && CursorX <= x + w && CursorY >= y && CursorY <= y + h)
@@ -2292,12 +2403,11 @@ void CMenu::Slider(int x, int y, float min, float max, float &value, char *text,
 				downTrueCount += 1;
 		}
 
-
 		if (cvar.m_Wheel_up)
-			value += 3 + upTrueCount;
+			value += step + upTrueCount;
 
 		if (cvar.m_Wheel_down)
-			value -= 3 + downTrueCount;
+			value -= step + downTrueCount;
 
 		cvar.m_Wheel_up = false;
 		cvar.m_Wheel_down = false;
@@ -2305,7 +2415,8 @@ void CMenu::Slider(int x, int y, float min, float max, float &value, char *text,
 		upTrueCount = 0;
 		downTrueCount = 0;
 
-		if (keys[VK_LBUTTON]) {
+		if (keys[VK_LBUTTON])
+		{
 			value = (CursorX - x) / one;
 
 			if (value < min)
@@ -2313,7 +2424,8 @@ void CMenu::Slider(int x, int y, float min, float max, float &value, char *text,
 			else if (value > max)
 				value = max;
 		}
-		else if (keys[VK_RBUTTON] && min < 0) {
+		else if (keys[VK_RBUTTON] && min < 0)
+		{
 			value = (CursorX - x) / one;
 			value *= -1;
 
@@ -2390,32 +2502,46 @@ void CMenu::Drag()
 	if (bCursorInList || bCursorInPalette)
 	{
 		IsDragging = false;
+#ifndef _MENUTAB_PLIST
 		IsDraggingPlist = false;
+#endif
 		return;
 	}
 
 	static int drag_x = 0;
 	static int drag_y = 0;
 
-	if ((IsDragging || IsDraggingPlist) && !keys[VK_LBUTTON])
+	if ((IsDragging 
+#ifndef _MENUTAB_PLIST
+		|| IsDraggingPlist
+#endif
+		) && !keys[VK_LBUTTON])
 	{
 		if (IsDragging)
 			IsDragging = false;
+#ifndef _MENUTAB_PLIST
 		else if (IsDraggingPlist)
 			IsDraggingPlist = false;
+#endif
 	}
-	else if ((IsDragging || IsDraggingPlist) && keys[VK_LBUTTON])
+	else if ((IsDragging
+#ifndef _MENUTAB_PLIST
+		|| IsDraggingPlist
+#endif
+		) && keys[VK_LBUTTON])
 	{
 		if (IsDragging)
 		{
 			MenuX = CursorX - drag_x;
 			MenuY = CursorY - drag_y;
 		}
+#ifndef _MENUTAB_PLIST
 		else if (IsDraggingPlist)
 		{
 			plistX = CursorX - drag_x;
 			plistY = CursorY - drag_y;
 		}
+#endif
 	}
 
 	//head move
@@ -2429,7 +2555,7 @@ void CMenu::Drag()
 		drag_y = CursorY - MenuY;
 		IsDragging = true;
 	}
-
+#ifndef _MENUTAB_PLIST
 	if (keys[VK_LBUTTON] && (
 		(CursorX >= plistX && CursorX <= background.width + plistX && CursorY >= plistY && CursorY <= plistY + BORDER_SIZE) ||
 		(CursorX >= plistX && CursorX <= plistX + BORDER_SIZE && CursorY >= plistY && CursorY <= background.height + plistY) ||
@@ -2440,6 +2566,7 @@ void CMenu::Drag()
 		drag_y = CursorY - plistY;
 		IsDraggingPlist = true;
 	}
+#endif
 }
 
 void CMenu::SelectTab()
@@ -2513,7 +2640,7 @@ void CMenu::Tooltip(const char* text, ...)
 	g_pISurface->DrawSetColor(10, 10, 10, 255);
 	g_pISurface->DrawFilledRect(startFillX, startFillY, endFillX, endFillY);
 
-	g_pISurface->DrawSetColor(cvar.cheat_global_color_r, cvar.cheat_global_color_g, cvar.cheat_global_color_b, 255);
+	g_pISurface->DrawSetColor(static_cast<int>(cvar.cheat_global_color_r), static_cast<int>(cvar.cheat_global_color_g), static_cast<int>(cvar.cheat_global_color_b), 255);
 	g_pISurface->DrawOutlinedRect(startFillX - scaling, startFillY - scaling, endFillX + scaling, endFillY + scaling);
 
 	auto strings = split_string(text, "\n");
@@ -2538,7 +2665,7 @@ void CMenu::DrawBox(int x, int y, int w, int h)
 	g_pISurface->DrawOutlinedRect(x - 1, y - 1, x + w + 1, y + h + 1);
 
 	//shadow
-	g_pISurface->DrawSetColor(cvar.cheat_global_color_r, cvar.cheat_global_color_g, cvar.cheat_global_color_b, 255);
+	g_pISurface->DrawSetColor(static_cast<int>(cvar.cheat_global_color_r), static_cast<int>(cvar.cheat_global_color_g), static_cast<int>(cvar.cheat_global_color_b), 255);
 	g_pISurface->DrawOutlinedRect(x - 2, y - 2, x + w + 2, y + h + 2);
 }
 
@@ -2571,8 +2698,8 @@ void CMenu::GroupBox(int x, int y, int w, int h, DWORD alignment, const char* na
 	g_pISurface->DrawSetColor(10, 10, 10, 255);
 	g_pISurface->DrawFilledRect(startFillX, startFillY, endFillX, endFillY);
 
-	//g_pISurface->DrawSetColor(100, 0, 0, 255);
-	//g_pISurface->DrawOutlinedRect(startFillX - scaling, startFillY - scaling, endFillX + scaling, endFillY + scaling);
+	g_pISurface->DrawSetColor(101, 0, 0, 255);
+	g_pISurface->DrawOutlinedRect(startFillX - scaling, startFillY - scaling, endFillX + scaling, endFillY + scaling);
 
 	g_Drawing.DrawString(MENU, x, (y - height / 2) - y_offset, 220, 220, 220, 255, name);
 }

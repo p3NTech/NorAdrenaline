@@ -22,12 +22,10 @@ int __fastcall hkInitiateGameConnection(ISteamUser* self, int, void* pData, int 
 	{
 		srand(time(NULL));
 
-		iSID = rand() % 9999999 + 1000000;
+		iSID = rand() % 99999999 + 10000000;
 	}
 	else
-	{
 		iSID = newSteamID;
-	}
 	
 	return GenerateRevEmu2013(pData, iSID);
 
@@ -77,12 +75,15 @@ void CSteamIDChanger::Apply(int newSID)
 	if (newSID == NULL)
 		RandomSteamID = true;
 	else
+	{
+		RandomSteamID = false;
 		newSteamID = newSID;
+	}
 
 	Change();
 }
 
 void CSteamIDChanger::Change()
 {
-	cvar.debug ? (ChangeSID() ? g_Engine.Con_Printf("SteamID changed successfully.\n") : g_Engine.Con_Printf("Failed to change SteamID.\n")) : ChangeSID() ? EXIT_SUCCESS : EXIT_FAILURE;
+	cvar.debug ? (ChangeSID() ? g_pConsole->DPrintf("SteamID changed successfully.\n") : g_pConsole->DPrintf("Failed to change SteamID.\n")) : ChangeSID() ? EXIT_SUCCESS : EXIT_FAILURE;
 }

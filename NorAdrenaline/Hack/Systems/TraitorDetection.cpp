@@ -29,7 +29,7 @@ void CTraitorDetection::Start(int indx)
 				Traitors.push_back(name);
 				TraitorsIdx.push_back(index);
 
-				g_Engine.Con_Printf("%s added to traitor list.\n", name);
+				g_pConsole->DPrintf("%s added to traitor list.\n", name);
 			}
 		}
 	}
@@ -63,7 +63,7 @@ void CTraitorDetection::Update(int idx)
 				{
 					g_Player[idx].bTraitor = false;
 					Traitors.erase(itr_s);
-					g_Engine.Con_Printf("%s removed from traitor list.\n", name);
+					g_pConsole->DPrintf("%s removed from traitor list.\n", name);
 				}
 			}
 		}
@@ -88,7 +88,7 @@ void CTraitorDetection::Draw()
 			if (cvar.aa_edge || cvar.aa_pitch || cvar.aa_yaw)
 				newline += 15;
 
-			if (cvar.aim_perfect_silent)
+			if (cvar.aim_method == 3)
 				newline += 15;
 		}
 		else

@@ -3,6 +3,7 @@
 
 #define CS_SIZE	64	// size of one config string
 
+/*
 typedef struct sizebuf_s {
 	qboolean		bOverflow;	// overflow reading or writing
 	const char	*pDebugName;	// buffer name (pointer to const name)
@@ -10,6 +11,16 @@ typedef struct sizebuf_s {
 	byte		*pData;
 	int		iCurBit;
 	int		nDataBits;
+} sizebuf_t;
+*/
+
+typedef struct sizebuf_s
+{
+	const char* buffername;
+	uint16 flags;
+	byte* data;
+	int maxsize;
+	int cursize;
 } sizebuf_t;
 
 typedef enum {

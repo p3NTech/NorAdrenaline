@@ -43,6 +43,8 @@ public:
 
 	Vector vViewAngles;
 	Vector vOrigin;
+	Vector vFootOrigin;
+	Vector vVelocity;
 	Vector vEye;
 	Vector vForward;
 	Vector vRight;
@@ -87,6 +89,7 @@ public:
 	Vector vAngles;
 	Vector vVelocity;
 	Vector vOrigin;
+	Vector vFootOrigin;
 	Vector vPrevOrigin;
 	Vector vFakeAngles;
 

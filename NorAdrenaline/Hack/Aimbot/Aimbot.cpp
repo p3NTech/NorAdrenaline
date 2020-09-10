@@ -495,7 +495,7 @@ void CAimBot::RageAimbot(struct usercmd_s *cmd)
 
 	if (cvar.aim_hitbox == 1)//"Head", "Neck", "Chest", "Stomach"
 	{
-		Hitboxes.push_back(3);
+		Hitboxes.push_back(11);
 	}
 	else if (cvar.aim_hitbox == 2)
 	{
@@ -588,13 +588,12 @@ void CAimBot::RageAimbot(struct usercmd_s *cmd)
 		if (m_iHitbox < 0 || m_iHitbox > g_Local.iMaxHitboxes)
 			continue;
 
-		/*
 		if (g_Player[id].bPriority)
 		{
 			m_iTarget = id;
 			break;
 		}
-		*/
+
 		//"Field of view", "Distance", "Cycle"
 		if (cvar.aim_target_selection == 1)
 		{
@@ -677,18 +676,20 @@ void CAimBot::RageAimbot(struct usercmd_s *cmd)
 			g_Utils.VectorAngles(vAimOrigin - g_Local.vEye, QAimAngles);
 
 			// We have to be in attack to process the rest. And also check the fov.
-			if (!(cmd->buttons & IN_ATTACK) && (cvar.aim_silent || cvar.aim_perfect_silent)) return;
+			if (!(cmd->buttons & IN_ATTACK) && (cvar.aim_method == 2 || cvar.aim_method == 3)) return;
 
-			if (cvar.aim_perfect_silent)
+			if (cvar.aim_method == 3)
 			{
+				if (!cvar.aim_bullet_time)
+					cvar.aim_bullet_time = true;
+
 				g_Utils.MakeAngle(false, QAimAngles, cmd);
 				g_Utils.bSendpacket(false);
 			}
-
 			else {
 				g_Utils.MakeAngle(false, QAimAngles, cmd);
 
-				if (!cvar.aim_silent)
+				if (cvar.aim_method != 2)
 					g_Engine.SetViewAngles(QAimAngles);
 			}
 		}
