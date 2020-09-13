@@ -132,16 +132,8 @@ std::string base64_encode(const std::string &in);
 std::string base64_decode(const std::string &in);
 std::string encryptDecrypt(std::string toEncrypt);
 
-static int GetStatus();
 static UINT64 get_cpuid(void);
 static CHAR* GetHWID();
-void Access();
 void SaveLicense();
 bool isInCharString(char* str1, char* search);
-void mParseUrl(char* mUrl, std::string& serverName, std::string& filepath, std::string& filename);
 int getHeaderLength(char* content);
-SOCKET connectToServer(char* szServerName, WORD portNum);
-char* readUrl2(char* szUrl, long& bytesReturnedOut, char** headerOut);
-
-std::string GetUrlData(std::string url);
-bool bCheck();
